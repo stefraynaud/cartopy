@@ -826,56 +826,16 @@ class Gridliner(object):
 
     def _axes_domain(self, nx=None, ny=None):
         """Return lon_range, lat_range"""
-        DEBUG = False
 
         transform = self._crs_transform()
 
-        ax_transform = self.axes.transAxes
-        desired_trans = ax_transform - transform
+        # Boundary in desired transform
+        lonlats = (self.axes.patch.get_transform() -
+                   transform).transform(self.axes.patch.get_path().vertices)
 
-        nx = nx or 100
-        ny = ny or 100
-        x = np.linspace(1e-9, 1 - 1e-9, nx)
-        y = np.linspace(1e-9, 1 - 1e-9, ny)
-        x, y = np.meshgrid(x, y)
-
-        coords = np.column_stack((x.ravel(), y.ravel()))
-
-        in_data = desired_trans.transform(coords)
-
-        ax_to_bkg_patch = self.axes.transAxes - self.axes.patch.get_transform()
-
-        # convert the coordinates of the data to the background patches
-        # coordinates
-        background_coord = ax_to_bkg_patch.transform(coords)
-        ok = self.axes.patch.get_path().contains_points(background_coord)
-
-        if DEBUG:
-            import matplotlib.pyplot as plt
-            plt.plot(coords[ok, 0], coords[ok, 1], 'or',
-                     clip_on=False, transform=ax_transform)
-            plt.plot(coords[~ok, 0], coords[~ok, 1], 'ob',
-                     clip_on=False, transform=ax_transform)
-
-        inside = in_data[ok, :]
-
-        # If there were no data points in the axes we just use the x and y
-        # range of the projection.
-        if inside.size == 0:
-            lon_range = self.crs.x_limits
-            lat_range = self.crs.y_limits
-        else:
-            # np.isfinite must be used to prevent np.inf values that
-            # not filtered by np.nanmax for some projections
-            lat_max = np.compress(np.isfinite(inside[:, 1]),
-                                  inside[:, 1])
-            if lat_max.size == 0:
-                lon_range = self.crs.x_limits
-                lat_range = self.crs.y_limits
-            else:
-                lat_max = lat_max.max()
-                lon_range = np.nanmin(inside[:, 0]), np.nanmax(inside[:, 0])
-                lat_range = np.nanmin(inside[:, 1]), lat_max
+        # Limits
+        lon_range = lonlats[:, 0].min(), lonlats[:, 0].max()
+        lat_range = lonlats[:, 1].min(), lonlats[:, 1].max()
 
         # XXX Cartopy specific thing. Perhaps make this bit a specialisation
         # in a subclass...
