@@ -756,8 +756,12 @@ class Gridliner(object):
                     angle = 0
 
                 if angle is not None:
-                    specs, _ = self._segment_angle_to_text_specs(angle, lonlat)
+                    specs, loc = self._segment_angle_to_text_specs(
+                        angle, lonlat)
                     artist.update(specs)
+                    if not getattr(self, loc+'_labels'):
+                        visible = False
+                        break
 
                 artist.update_bbox_position_size(renderer)
                 this_patch = artist.get_bbox_patch()
