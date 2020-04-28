@@ -13,7 +13,6 @@ import warnings
 import numpy as np
 import matplotlib.pyplot as plt
 import pytest
-import six
 
 import cartopy.crs as ccrs
 
@@ -93,7 +92,7 @@ def test_global_pcolor_wrap_new_transform():
     ax = plt.axes(projection=ccrs.PlateCarree())
     ax.coastlines()
     x, y = np.meshgrid(np.linspace(0, 360), np.linspace(-90, 90))
-    data = np.sin(np.sqrt(x ** 2 + y ** 2))
+    data = np.sin(np.sqrt(x ** 2 + y ** 2))[:-1, :-1]
     plt.pcolor(x, y, data, transform=ccrs.PlateCarree())
 
 
@@ -103,7 +102,7 @@ def test_global_pcolor_wrap_no_transform():
     ax = plt.axes(projection=ccrs.PlateCarree())
     ax.coastlines()
     x, y = np.meshgrid(np.linspace(0, 360), np.linspace(-90, 90))
-    data = np.sin(np.sqrt(x ** 2 + y ** 2))
+    data = np.sin(np.sqrt(x ** 2 + y ** 2))[:-1, :-1]
     plt.pcolor(x, y, data)
 
 
@@ -148,6 +147,7 @@ def test_global_map():
              transform=ccrs.Geodetic())
 
 
+@pytest.mark.filterwarnings("ignore:Unable to determine extent")
 @pytest.mark.natural_earth
 @ImageTesting(['simple_global'])
 def test_simple_global():
@@ -156,6 +156,7 @@ def test_simple_global():
     # produces a global map, despite not having needed to set the limits
 
 
+@pytest.mark.filterwarnings("ignore:Unable to determine extent")
 @pytest.mark.natural_earth
 @ImageTesting(['multiple_projections4' if ccrs.PROJ4_VERSION < (5, 0, 0)
                else 'multiple_projections5'],
@@ -187,7 +188,7 @@ def test_multiple_projections():
                    ccrs.EckertVI(),
                    ]
 
-    rows = np.ceil(len(projections) / 5)
+    rows = np.ceil(len(projections) / 5).astype(int)
 
     fig = plt.figure(figsize=(10, 2 * rows))
     for i, prj in enumerate(projections, 1):
@@ -234,19 +235,19 @@ def test_cursor_values():
     x, y = np.array([-969100.]), np.array([-4457000.])
     r = ax.format_coord(x, y)
     assert (r.encode('ascii', 'ignore') ==
-            six.b('-9.691e+05, -4.457e+06 (50.716617N, 12.267069W)'))
+            b'-9.691e+05, -4.457e+06 (50.716617N, 12.267069W)')
 
     ax = plt.axes(projection=ccrs.PlateCarree())
     x, y = np.array([-181.5]), np.array([50.])
     r = ax.format_coord(x, y)
     assert (r.encode('ascii', 'ignore') ==
-            six.b('-181.5, 50 (50.000000N, 178.500000E)'))
+            b'-181.5, 50 (50.000000N, 178.500000E)')
 
     ax = plt.axes(projection=ccrs.Robinson())
     x, y = np.array([16060595.2]), np.array([2363093.4])
     r = ax.format_coord(x, y)
-    assert re.search(six.b('1.606e\\+07, 2.363e\\+06 '
-                           '\\(22.09[0-9]{4}N, 173.70[0-9]{4}E\\)'),
+    assert re.search(b'1.606e\\+07, 2.363e\\+06 '
+                     b'\\(22.09[0-9]{4}N, 173.70[0-9]{4}E\\)',
                      r.encode('ascii', 'ignore'))
 
     plt.close()
