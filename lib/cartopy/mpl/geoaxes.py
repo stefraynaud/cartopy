@@ -1308,6 +1308,7 @@ class GeoAxes(matplotlib.axes.Axes):
                   xlocs=None, ylocs=None, dms=False,
                   x_inline=None, y_inline=None, auto_inline=True,
                   xformatter=None, yformatter=None,
+                  rotate_labels=True,
                   **kwargs):
         """
         Automatically add gridlines to the axes, in the given coordinate
@@ -1357,6 +1358,8 @@ class GeoAxes(matplotlib.axes.Axes):
             use of a :class:`cartopy.mpl.ticker.LatitudeFormatter` initiated
             with the ``dms`` argument, if the crs is of
             :class:`~cartopy.crs.PlateCarree` type.
+        rotate_labels: optional
+            Allow the rotation of labels.
 
         Keyword Parameters
         ------------------
@@ -1385,7 +1388,8 @@ class GeoAxes(matplotlib.axes.Axes):
             self, crs=crs, draw_labels=draw_labels, xlocator=xlocs,
             ylocator=ylocs, collection_kwargs=kwargs, dms=dms,
             x_inline=x_inline, y_inline=y_inline, auto_inline=auto_inline,
-            xformatter=xformatter, yformatter=yformatter)
+            xformatter=xformatter, yformatter=yformatter,
+            rotate_labels=rotate_labels)
         self._gridliners.append(gl)
         return gl
 

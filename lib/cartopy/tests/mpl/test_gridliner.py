@@ -321,3 +321,54 @@ def test_gridliner_default_fmtloc(
     plt.close()
     assert isinstance(gl.xlocator, xloc_expected)
     assert isinstance(gl.xformatter, xfmt_expected)
+
+
+@pytest.mark.parametrize(
+    "draw_labels, result",
+    [
+        (True,
+         {'left': ['70°E', '40°N'],
+          'right': ['130°E', '40°N', '50°N'],
+          'top': ['130°E', '50°N', '100°E', '70°E'],
+          'bottom': ['100°E']}),
+        (False,
+         {'left': [],
+          'right': [],
+          'top': [],
+          'bottom': []}),
+        (['top', 'left'],
+         {'left': ['70°E', '40°N'],
+          'right': [],
+
+          'top': ['130°E', '100°E', '50°N', '70°E'],
+          'bottom': []}),
+        ({'top': 'x', 'right': 'y'},
+         {'left': [],
+          'right': ['40°N', '50°N'],
+          'top': ['100°E', '130°E', '70°E'],
+          'bottom': []}),
+        ({'left': 'x'},
+         {'left': ['70°E'],
+          'right': [],
+          'top': [],
+          'bottom': []}),
+        ({'top': 'y'},
+         {'left': [],
+          'right': [],
+          'top': ['50°N'],
+          'bottom': []}),
+     ])
+def test_gridliner_draw_labels_param(draw_labels, result):
+    plt.figure()
+    lambert_crs = ccrs.LambertConformal(central_longitude=105)
+    ax = plt.axes(projection=lambert_crs)
+    ax.set_extent([75, 130, 18, 54], crs=ccrs.PlateCarree())
+    gl = ax.gridlines(draw_labels=draw_labels, rotate_labels=False, dms=True,
+                      x_inline=False, y_inline=False)
+    gl.xlocator = mticker.FixedLocator([70, 100, 130])
+    gl.ylocator = mticker.FixedLocator([40, 50])
+    plt.show()
+    res = {}
+    for loc in 'left', 'right', 'top', 'bottom':
+        artists = getattr(gl, loc+'_label_artists')
+        res[loc] = [a.get_text() for a in artists if a.get_visible()]

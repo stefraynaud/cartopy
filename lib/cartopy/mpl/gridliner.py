@@ -107,7 +107,8 @@ class Gridliner(object):
     def __init__(self, axes, crs, draw_labels=False, xlocator=None,
                  ylocator=None, collection_kwargs=None,
                  xformatter=None, yformatter=None, dms=False,
-                 x_inline=None, y_inline=None, auto_inline=True):
+                 x_inline=None, y_inline=None, auto_inline=True,
+                 rotate_labels=True):
         """
         Object used by :meth:`cartopy.mpl.geoaxes.GeoAxes.gridlines`
         to add gridlines and tick labels to a map.
@@ -122,6 +123,14 @@ class Gridliner(object):
         draw_labels: optional
             Toggle whether to draw labels. For finer control, attributes of
             :class:`Gridliner` may be modified individually. Defaults to False.
+            It accepts strings ``"x"`` and ``"y"`` to only draw labels of
+            x or y coordinates of the given CRS.
+            When a list is passed as argument, items may contain side
+            identifiers ``"top"``, ``"bottom"``, ``"left"`` and ``"right"``
+            to select where to draw the labels.
+            When a dictionary is provided, keys are the side identifiers
+            and values are ``"x"`` or ``"y"``; this way you can precisely
+            decide what kind of label to draw and where.
         xlocator: optional
             A :class:`matplotlib.ticker.Locator` instance which will be used
             to determine the locations of the gridlines in the x-coordinate of
@@ -157,6 +166,8 @@ class Gridliner(object):
             Toggle whether the y labels drawn should be inline.
         auto_inline: optional
             Set x_inline and y_inline automatically based on projection.
+        rotate_labels: optional
+            Allow the rotation of labels.
 
         Notes
         -----
@@ -207,17 +218,40 @@ class Gridliner(object):
         #: The :class:`~matplotlib.ticker.Formatter` to use for the lat labels.
         self.yformatter = yformatter
 
-        #: Whether to draw labels on the top of the map.
-        self.top_labels = draw_labels
+        if isinstance(draw_labels, list):
 
-        #: Whether to draw labels on the bottom of the map.
-        self.bottom_labels = draw_labels
+            #: Whether to draw labels on the top of the map.
+            self.top_labels = 'top' in draw_labels
 
-        #: Whether to draw labels on the left hand side of the map.
-        self.left_labels = draw_labels
+            #: Whether to draw labels on the bottom of the map.
+            self.bottom_labels = 'bottom' in draw_labels
 
-        #: Whether to draw labels on the right hand side of the map.
-        self.right_labels = draw_labels
+            #: Whether to draw labels on the left hand side of the map.
+            self.left_labels = 'left' in draw_labels
+
+            #: Whether to draw labels on the right hand side of the map.
+            self.right_labels = 'right' in draw_labels
+
+        elif isinstance(draw_labels, dict):
+
+            self.top_labels = draw_labels.get('top', False)
+            self.bottom_labels = draw_labels.get('bottom', False)
+            self.left_labels = draw_labels.get('left', False)
+            self.right_labels = draw_labels.get('right', False)
+
+        else:
+
+            self.top_labels = draw_labels
+            self.bottom_labels = draw_labels
+            self.left_labels = draw_labels
+            self.right_labels = draw_labels
+
+        for loc in 'top', 'bottom', 'left', 'right':
+            value = getattr(self, loc + '_labels')
+            if isinstance(value, str):
+                value = value.lower()
+            assert value in (True, False, 'x', 'y'), (
+                "Invalid draw_labels argument: "+str(value))
 
         if auto_inline:
             if isinstance(self.axes.projection, _X_INLINE_PROJS):
@@ -264,7 +298,7 @@ class Gridliner(object):
         self.ypadding = 5
 
         #: Allow the rotation of labels.
-        self.rotate_labels = True
+        self.rotate_labels = rotate_labels
 
         # Current transform
         self.crs = crs
@@ -393,6 +427,17 @@ class Gridliner(object):
         midpoints = (self._round(np.percentile(lim, lq), cent),
                      self._round(np.percentile(lim, uq), cent))
         return midpoints
+
+    def _draw_this_label(self, lonlat, loc):
+        """Should I draw this kind of label here?"""
+        draw_labels = getattr(self, loc+'_labels')
+        if not draw_labels:
+            return False
+        if (isinstance(draw_labels, str) and
+                draw_labels !=
+                {'lon': 'x', 'lat': 'y'}[lonlat]):
+            return False
+        return True
 
     def _draw_gridliner(self, nx=None, ny=None, renderer=None):
         """Create Artists for all visible elements and add to our Axes."""
@@ -586,8 +631,8 @@ class Gridliner(object):
                         for i, (pt0, pt1) in enumerate([tail, head]):
                             kw, angle, loc = self._segment_to_text_specs(
                                 pt0, pt1, lonlat)
-                            if not getattr(self, loc+'_labels'):
-                                continue
+                            # if not self._draw_this_label(lonlat, loc):
+                            #     continue
                             kw.update(label_style,
                                       bbox={'pad': 0, 'visible': False})
                             text = formatter(tick_value)
@@ -621,7 +666,7 @@ class Gridliner(object):
                                         ((lonlat == 'lat') and
                                          loc in ('left', 'right')))
                             self._labels.append((lonlat, priority, tt))
-                            getattr(self, loc + '_label_artists').append(tt)
+                            # getattr(self, loc + '_label_artists').append(tt)
 
         # Sort labels
         if self._labels:
@@ -656,22 +701,32 @@ class Gridliner(object):
         # Options that depend in which quarter the angle falls
         if abs(angle) <= 45:
             loc = 'right'
-            kw.update(ha='left', va='center')
-
         elif abs(angle) >= 135:
             loc = 'left'
-            kw.update(ha='right', va='center')
             kw['rotation'] -= np.sign(angle) * 180
-
         elif angle > 45:
             loc = 'top'
-            kw.update(ha='center', va='bottom', rotation=angle-90)
-
+            kw.update(rotation=angle-90)
         else:
             loc = 'bottom'
-            kw.update(ha='center', va='top', rotation=angle+90)
+            kw.update(rotation=angle+90)
+
+        kw.update(self._get_alignments_from_loc(loc))
 
         return kw, loc
+
+    @staticmethod
+    def _get_alignments_from_loc(loc):
+        kw = {}
+        if loc == 'right':
+            kw.update(ha='left', va='center')
+        elif loc == 'left':
+            kw.update(ha='right', va='center')
+        elif loc == 'top':
+            kw.update(ha='center', va='bottom')
+        else:
+            kw.update(ha='center', va='top')
+        return kw
 
     def _segment_angle_to_text_specs(self, angle, lonlat):
         """Get appropriate kwargs for a given text angle"""
@@ -698,6 +753,33 @@ class Gridliner(object):
 
         return kw, loc
 
+    def _get_loc_from_spines(self, spines_specs, label_path):
+        """Try to get the location from side spines and laebl path
+
+        For instance, for each side, if any of label_path x coordinates
+        are beyond this side, the distance to this side is computed.
+        If several sides are matching (max 2), then the one with a greater
+        distance is kept.
+
+        This helps finding the side of labels for non-rectangular projection
+        with a rectangular map boundary.
+
+        """
+        side_max = dist_max = None
+        for side, specs in spines_specs.items():
+            label_coords = label_path.vertices[:-1, specs['index']]
+            spine_coord = specs['coord_value']
+            if not specs['op'](label_coords, spine_coord).any():
+                continue
+            if specs['op'] is operator.ge:  # top, right
+                dist = label_coords.min() - spine_coord
+            else:
+                dist = spine_coord - label_coords.max()
+            if side_max is None or dist > dist_max:
+                side_max = side
+                dist_max = dist
+        return side_max
+
     def _update_labels_visibility(self, renderer):
         """Update the visibility of each plotted label
 
@@ -719,6 +801,15 @@ class Gridliner(object):
         delta_angle = 22.5
         max_delta_angle = 45
         axes_children = self.axes.get_children()
+        spines_specs = {
+            'left': {'coord_name': 'x0', 'op': operator.le, 'index': 0},
+            'bottom': {'coord_name': 'y0', 'op': operator.le, 'index': 1},
+            'right': {'coord_name': 'x0', 'op': operator.ge, 'index': 0},
+            'top': {'coord_name': 'y0', 'op': operator.ge, 'index': 1},
+        }
+        for side, specs in spines_specs.items():
+            bbox = self.axes.spines[side].get_tightbbox(renderer)
+            specs['coord_value'] = getattr(bbox, specs['coord_name'])
 
         def remove_path_dupes(path):
             """
@@ -744,12 +835,17 @@ class Gridliner(object):
             orig_specs = {'rotation': artist.get_rotation(),
                           'ha': artist.get_ha(),
                           'va': artist.get_va()}
+            visible = True
+
             # Compute angles to try
             angles = [None]
-            for abs_delta_angle in np.arange(delta_angle, max_delta_angle+1,
-                                             delta_angle):
-                angles.append(artist._angle + abs_delta_angle)
-                angles.append(artist._angle - abs_delta_angle)
+            loc = None
+            if self.rotate_labels:
+                for abs_delta_angle in np.arange(delta_angle,
+                                                 max_delta_angle+1,
+                                                 delta_angle):
+                    angles.append(artist._angle + abs_delta_angle)
+                    angles.append(artist._angle - abs_delta_angle)
 
             # Loop on angles until it works
             for angle in angles:
@@ -757,23 +853,32 @@ class Gridliner(object):
                         (self.y_inline and lonlat == 'lat')):
                     angle = 0
 
-                if angle is not None:
-                    specs, loc = self._segment_angle_to_text_specs(
-                        angle, lonlat)
-                    artist.update(specs)
-                    if not getattr(self, loc+'_labels'):
-                        visible = False
-                        break
-
+                # Get label path
                 artist.update_bbox_position_size(renderer)
                 this_patch = artist.get_bbox_patch()
                 this_path = this_patch.get_path().transformed(
                     this_patch.get_transform())
                 if '3.1.0' <= matplotlib.__version__ <= '3.1.2':
                     this_path = remove_path_dupes(this_path)
+
+                # Check visibility and more from angle and path
+                if angle is None:
+                    angle = artist._angle
+                specs, loc = self._segment_angle_to_text_specs(
+                    angle, lonlat)
+                artist.update(specs)
+                # if not first_time:
+                new_loc = self._get_loc_from_spines(
+                    spines_specs, this_path)
+                if new_loc and loc != new_loc:
+                    loc = new_loc
+                    artist.update(self._get_alignments_from_loc(loc))
+                if not self._draw_this_label(lonlat, loc):
+                    visible = False
+                    break
+
                 center = artist.get_transform().transform_point(
                     artist.get_position())
-                visible = False
 
                 for path in paths:
 
@@ -798,6 +903,7 @@ class Gridliner(object):
                             visible = True
                     # Non-inline must not run through the outline.
                     elif not outline_path.intersects_path(this_path):
+                        # Update the side location with spines if possible
                         visible = True
 
                     # Good
@@ -808,7 +914,18 @@ class Gridliner(object):
                         (self.y_inline and lonlat == 'lat')):
                     break
 
-            # Action
+            # Updates
+            if loc is not None:
+                artist.update(self._get_alignments_from_loc(loc))
+                for side in 'left', 'right', 'top', 'bottom':
+                    artists = getattr(self, side+'_label_artists')
+                    sartists = set(artists)
+                    artists.clear()
+                    if side == loc:
+                        sartists = sartists | {artist}
+                    else:
+                        sartists = sartists - {artist}
+                    artists.extend(sartists)
             artist.set_visible(visible)
             if not visible:
                 artist.update(orig_specs)
