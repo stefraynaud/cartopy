@@ -127,7 +127,8 @@ class Gridliner(object):
             x or y coordinates of the given CRS.
             When a list is passed as argument, items may contain side
             identifiers ``"top"``, ``"bottom"``, ``"left"`` and ``"right"``
-            to select where to draw the labels.
+            to select where to draw the labels, and coordinate types
+            ``"x"`` and ``y``" to select which one to draw.
             When a dictionary is provided, keys are the side identifiers
             and values are ``"x"`` or ``"y"``; this way you can precisely
             decide what kind of label to draw and where.
@@ -218,19 +219,28 @@ class Gridliner(object):
         #: The :class:`~matplotlib.ticker.Formatter` to use for the lat labels.
         self.yformatter = yformatter
 
+        # Draw label argument
         if isinstance(draw_labels, list):
 
+            # Select to which coordinate it is applied
+            if 'x' not in draw_labels and 'y' not in draw_labels:
+                value = True
+            elif 'x' in draw_labels:
+                value = 'x'
+            else:
+                value = 'y'
+
             #: Whether to draw labels on the top of the map.
-            self.top_labels = 'top' in draw_labels
+            self.top_labels = value if 'top' in draw_labels else False
 
             #: Whether to draw labels on the bottom of the map.
-            self.bottom_labels = 'bottom' in draw_labels
+            self.bottom_labels = value if 'bottom' in draw_labels else False
 
             #: Whether to draw labels on the left hand side of the map.
-            self.left_labels = 'left' in draw_labels
+            self.left_labels = value if 'left' in draw_labels else False
 
             #: Whether to draw labels on the right hand side of the map.
-            self.right_labels = 'right' in draw_labels
+            self.right_labels = value if 'right' in draw_labels else False
 
         elif isinstance(draw_labels, dict):
 
@@ -323,8 +333,29 @@ class Gridliner(object):
         #: The y gridlines which were created at draw time.
         self.yline_artists = []
 
-        # Plotted status
-        self._plotted = False
+        #: The bottom labels which were created at draw time.
+        self.bottom_label_artists = []
+
+        #: The top labels which were created at draw time.
+        self.top_label_artists = []
+
+        #: The left labels which were created at draw time.
+        self.left_label_artists = []
+
+        #: The right labels which were created at draw time.
+        self.right_label_artists = []
+
+        #: The inline labels which were created at draw time.
+        self.inline_label_artists = []
+
+        #: The x-coordinate labels which were created at draw time.
+        self.xlabel_artists = []
+
+        #: The y-coordinate labels which were created at draw time.
+        self.ylabel_artists = []
+
+        # List of all labels
+        self._labels = []
 
         # Check visibility of labels at each draw event
         # (or once drawn, only at resize event ?)
@@ -379,17 +410,16 @@ class Gridliner(object):
         self.right_labels = value
 
     def _draw_event(self, event):
-        if self.has_labels():
-            self._update_labels_visibility(event.renderer)
+        self._draw_gridliner(renderer=event.renderer)
+        # if self.has_labels():
+        #     self._update_labels_visibility(event.renderer)
 
     def has_labels(self):
-        return hasattr(self, '_labels') and self._labels
+        return len(self._labels) != 0
 
     @property
     def label_artists(self):
-        if self.has_labels():
-            return self._labels
-        return []
+        return [label[1] for label in self._labels]
 
     def _crs_transform(self):
         """
@@ -440,15 +470,39 @@ class Gridliner(object):
         return True
 
     def _draw_gridliner(self, nx=None, ny=None, renderer=None):
-        """Create Artists for all visible elements and add to our Axes."""
-        # Check status
-        if self._plotted:
-            return
-        self._plotted = True
+        """Create Artists for all visible elements and add to our Axes.
+
+        The following rules apply for the visibility of labels:
+
+        - Labels are plotted and checked by order of priority,
+          with a high priority for longitude labels at the bottom and
+          top of the map, and the reverse for latitude labels.
+        - A label must not overlap another label marked as visible.
+        - A label must not overlap the map boundary.
+        - When a label is about to be hidden, other angles are tried in the
+          absolute given limit of max_delta_angle by increments of delta_angle
+          of difference from the original angle.
+        """
+        # Clear lists of artists
+        for lines in self.xline_artists + self.yline_artists:
+            if lines in self.axes.collections:
+                self.axes.collections.remove(lines)
+        self.xline_artists.clear()
+        self.yline_artists.clear()
+        for label in self._labels:
+            if label[1] in self.axes.texts:
+                self.axes.texts.remove(label[1])
+        self._labels.clear()
+        self.top_label_artists.clear()
+        self.bottom_label_artists.clear()
+        self.right_label_artists.clear()
+        self.left_label_artists.clear()
+        self.inline_label_artists.clear()
+        self.xlabel_artists.clear()
+        self.ylabel_artists.clear()
 
         # Inits
         lon_lim, lat_lim = self._axes_domain(nx=nx, ny=ny)
-
         transform = self._crs_transform()
         rc_params = matplotlib.rcParams
         n_steps = self.n_steps
@@ -521,20 +575,47 @@ class Gridliner(object):
         # Label drawing #
         #################
 
-        self.bottom_label_artists = []
-        self.top_label_artists = []
-        self.left_label_artists = []
-        self.right_label_artists = []
         if not (self.left_labels or self.right_labels or
                 self.bottom_labels or self.top_labels):
             return
         self._assert_can_draw_ticks()
 
-        # Get the real map boundaries
-        map_boundary_vertices = self.axes.patch.get_path().vertices
-        map_boundary = sgeom.Polygon(map_boundary_vertices)
+        outline_path = None
+        delta_angle = 22.5
+        max_delta_angle = 45
+        spines_specs = {
+            'left': {'coord_name': 'x0', 'op': operator.le, 'index': 0},
+            'bottom': {'coord_name': 'y0', 'op': operator.le, 'index': 1},
+            'right': {'coord_name': 'x0', 'op': operator.ge, 'index': 0},
+            'top': {'coord_name': 'y0', 'op': operator.ge, 'index': 1},
+        }
+        for side, specs in spines_specs.items():
+            bbox = self.axes.spines[side].get_tightbbox(renderer)
+            specs['coord_value'] = getattr(bbox, specs['coord_name'])
 
-        self._labels = []
+        def remove_path_dupes(path):
+            """
+            Remove duplicate points in a path (zero-length segments).
+
+            This is necessary only for Matplotlib 3.1.0 -- 3.1.2, because
+            Path.intersects_path incorrectly returns True for any paths with
+            such segments.
+            """
+            segment_length = np.diff(path.vertices, axis=0)
+            mask = np.logical_or.reduce(segment_length != 0, axis=1)
+            mask = np.append(mask, True)
+            path = mpath.Path(np.compress(mask, path.vertices, axis=0),
+                              np.compress(mask, path.codes, axis=0))
+            return path
+
+        # Get the real map boundaries
+        self.axes.spines["geo"].get_tightbbox(renderer)  # update coords
+        map_boundary_path = self.axes.spines["geo"].get_path()
+        map_boundary_vertices = map_boundary_path.vertices
+        map_boundary = sgeom.Polygon(map_boundary_vertices)
+        outline_path = map_boundary_path.transformed(self.axes.transData)
+        if '3.1.0' <= matplotlib.__version__ <= '3.1.2':
+            outline_path = remove_path_dupes(outline_path)
 
         if self.x_inline:
             y_midpoints = self._find_midpoints(lat_lim, lat_ticks)
@@ -546,6 +627,10 @@ class Gridliner(object):
                  self.xformatter, self.xlabel_style),
                 ('lat', lat_lines, lat_ticks,
                  self.yformatter, self.ylabel_style)):
+            xy = {'lon': 'x', 'lat': 'y'}[lonlat]
+
+            x_inline = self.x_inline and lonlat == 'lon'
+            y_inline = self.y_inline and lonlat == 'lat'
 
             formatter.set_locs(line_ticks)
 
@@ -629,15 +714,12 @@ class Gridliner(object):
                     # Loop on head and tail and plot label by extrapolation
                     for tail, head in zip(tails, heads):
                         for i, (pt0, pt1) in enumerate([tail, head]):
-                            kw, angle, loc = self._segment_to_text_specs(
+                            kw, orig_angle, loc = self._segment_to_text_specs(
                                 pt0, pt1, lonlat)
-                            # if not self._draw_this_label(lonlat, loc):
-                            #     continue
                             kw.update(label_style,
                                       bbox={'pad': 0, 'visible': False})
-                            text = formatter(tick_value)
 
-                            if self.y_inline and lonlat == 'lat':
+                            if y_inline:
                                 # 180 degrees isn't formatted with a
                                 # suffix and adds confusion if it's inline
                                 if abs(tick_value) == 180:
@@ -650,7 +732,7 @@ class Gridliner(object):
                                 x = pt0[0]
                                 y_set = False
 
-                            if self.x_inline and lonlat == 'lon':
+                            if x_inline:
                                 if abs(tick_value) == 180:
                                     continue
                                 x = tick_value
@@ -659,19 +741,122 @@ class Gridliner(object):
                             elif not y_set:
                                 y = pt0[1]
 
-                            tt = self.axes.text(x, y, text, **kw)
-                            tt._angle = angle
+                            # Add text
+                            text = formatter(tick_value)
+                            artist = self.axes.text(x, y, text, **kw)
+                            artist._angle = orig_angle
+
+                            # Loop on angles until it works
+                            orig_specs = {'rotation': artist.get_rotation(),
+                                          'ha': artist.get_ha(),
+                                          'va': artist.get_va()}
+                            visible = True
+
+                            # Compute angles to try
+                            loc = None
+                            if x_inline or y_inline:
+                                angles = [0]
+                            else:
+                                angles = [None]
+                                if self.rotate_labels:
+                                    for abs_delta_angle in np.arange(
+                                            delta_angle,
+                                            max_delta_angle+1,
+                                            delta_angle):
+                                        angles.append(artist._angle +
+                                                      abs_delta_angle)
+                                        angles.append(artist._angle -
+                                                      abs_delta_angle)
+
+                            # Loop on angles until it works
+                            for angle in angles:
+
+                                # Get label path
+                                artist.update_bbox_position_size(renderer)
+                                this_patch = artist.get_bbox_patch()
+                                this_path = this_patch.get_path().transformed(
+                                    this_patch.get_transform())
+                                if ('3.1.0' <= matplotlib.__version__
+                                        <= '3.1.2'):
+                                    this_path = remove_path_dupes(this_path)
+
+                                # Check visibility and more from angle and path
+                                if angle is None:
+                                    angle = artist._angle
+                                specs, loc = self._segment_angle_to_text_specs(
+                                    angle, lonlat)
+                                artist.update(specs)
+                                new_loc = self._get_loc_from_spines(
+                                    spines_specs, this_path)
+                                if new_loc and loc != new_loc:
+                                    loc = new_loc
+                                    artist.update(
+                                        self._get_alignments_from_loc(loc))
+                                if not self._draw_this_label(lonlat, loc):
+                                    visible = False
+                                    break
+
+                                center = artist.get_transform(
+                                    ).transform_point(artist.get_position())
+
+                                # Check that it does not overlap the map
+                                # Inline must be within the map.
+                                if x_inline or y_inline:
+                                    # TODO: When Matplotlib clip path
+                                    # works on text, this
+                                    # clipping can be left to it.
+                                    if outline_path.contains_point(center):
+                                        visible = True
+                                    loc = 'inline'
+                                # Non-inline must not run through the outline.
+                                elif not outline_path.intersects_path(
+                                        this_path):
+                                    visible = True
+
+                                # Good
+                                if visible:
+                                    break
+
+                            # Updates
+                            if loc == 'inline':
+                                self.inline_label_artists.append(artist)
+                            elif loc is not None:
+                                artist.update(
+                                    self._get_alignments_from_loc(loc))
+                                for side in 'left', 'right', 'top', 'bottom':
+                                    artists = getattr(self,
+                                                      side+'_label_artists')
+                                    sartists = set(artists)
+                                    artists.clear()
+                                    if side == loc:
+                                        sartists = sartists | {artist}
+                                    else:
+                                        sartists = sartists - {artist}
+                                    artists.extend(sartists)
+                            artist.set_visible(visible)
+                            if not visible:
+                                artist.update(orig_specs)
+                            xy_labels = getattr(self, xy+'label_artists')
+                            xy_labels.append(artist)
                             priority = (((lonlat == 'lon') and
                                          loc in ('bottom', 'top')) or
                                         ((lonlat == 'lat') and
                                          loc in ('left', 'right')))
-                            self._labels.append((lonlat, priority, tt))
-                            # getattr(self, loc + '_label_artists').append(tt)
+                            self._labels.append(
+                                (priority, artist, this_path))
 
-        # Sort labels
+        # Now check overlapping of ordered visible labels
         if self._labels:
             self._labels.sort(key=operator.itemgetter(0), reverse=True)
-            self._update_labels_visibility(renderer)
+            paths = []
+            for priority, artist, this_path in self._labels:
+                if artist.get_visible():
+                    for path in paths:
+                        if this_path.intersects_path(path):
+                            artist.set_visible(False)
+                            break
+                    else:
+                        paths.append(this_path)
 
     def _segment_to_text_specs(self, pt0, pt1, lonlat):
         """Get appropriate kwargs for a label from lon or lat line segment"""
@@ -779,158 +964,6 @@ class Gridliner(object):
                 side_max = side
                 dist_max = dist
         return side_max
-
-    def _update_labels_visibility(self, renderer):
-        """Update the visibility of each plotted label
-
-        The following rules apply:
-
-        - Labels are plotted and checked by order of priority,
-          with a high priority for longitude labels at the bottom and
-          top of the map, and the reverse for latitude labels.
-        - A label must not overlap another label marked as visible.
-        - A label must not overlap the map boundary.
-        - When a label is about to be hidden, other angles are tried in the
-          absolute given limit of max_delta_angle by increments of delta_angle
-          of difference from the original angle.
-        """
-        if renderer is None or not self._labels:
-            return
-        paths = []
-        outline_path = None
-        delta_angle = 22.5
-        max_delta_angle = 45
-        axes_children = self.axes.get_children()
-        spines_specs = {
-            'left': {'coord_name': 'x0', 'op': operator.le, 'index': 0},
-            'bottom': {'coord_name': 'y0', 'op': operator.le, 'index': 1},
-            'right': {'coord_name': 'x0', 'op': operator.ge, 'index': 0},
-            'top': {'coord_name': 'y0', 'op': operator.ge, 'index': 1},
-        }
-        for side, specs in spines_specs.items():
-            bbox = self.axes.spines[side].get_tightbbox(renderer)
-            specs['coord_value'] = getattr(bbox, specs['coord_name'])
-
-        def remove_path_dupes(path):
-            """
-            Remove duplicate points in a path (zero-length segments).
-
-            This is necessary only for Matplotlib 3.1.0 -- 3.1.2, because
-            Path.intersects_path incorrectly returns True for any paths with
-            such segments.
-            """
-            segment_length = np.diff(path.vertices, axis=0)
-            mask = np.logical_or.reduce(segment_length != 0, axis=1)
-            mask = np.append(mask, True)
-            path = mpath.Path(np.compress(mask, path.vertices, axis=0),
-                              np.compress(mask, path.codes, axis=0))
-            return path
-
-        for lonlat, priority, artist in self._labels:
-
-            if artist not in axes_children:
-                warnings.warn('The labels of this gridliner do not belong to '
-                              'the gridliner axes')
-
-            orig_specs = {'rotation': artist.get_rotation(),
-                          'ha': artist.get_ha(),
-                          'va': artist.get_va()}
-            visible = True
-
-            # Compute angles to try
-            angles = [None]
-            loc = None
-            if self.rotate_labels:
-                for abs_delta_angle in np.arange(delta_angle,
-                                                 max_delta_angle+1,
-                                                 delta_angle):
-                    angles.append(artist._angle + abs_delta_angle)
-                    angles.append(artist._angle - abs_delta_angle)
-
-            # Loop on angles until it works
-            for angle in angles:
-                if ((self.x_inline and lonlat == 'lon') or
-                        (self.y_inline and lonlat == 'lat')):
-                    angle = 0
-
-                # Get label path
-                artist.update_bbox_position_size(renderer)
-                this_patch = artist.get_bbox_patch()
-                this_path = this_patch.get_path().transformed(
-                    this_patch.get_transform())
-                if '3.1.0' <= matplotlib.__version__ <= '3.1.2':
-                    this_path = remove_path_dupes(this_path)
-
-                # Check visibility and more from angle and path
-                if angle is None:
-                    angle = artist._angle
-                specs, loc = self._segment_angle_to_text_specs(
-                    angle, lonlat)
-                artist.update(specs)
-                # if not first_time:
-                new_loc = self._get_loc_from_spines(
-                    spines_specs, this_path)
-                if new_loc and loc != new_loc:
-                    loc = new_loc
-                    artist.update(self._get_alignments_from_loc(loc))
-                if not self._draw_this_label(lonlat, loc):
-                    visible = False
-                    break
-
-                center = artist.get_transform().transform_point(
-                    artist.get_position())
-
-                for path in paths:
-
-                    # Check it does not overlap another label
-                    if this_path.intersects_path(path):
-                        break
-
-                else:
-
-                    # Finally check that it does not overlap the map
-                    if outline_path is None:
-                        outline_path = (self.axes.patch.get_path()
-                                        .transformed(self.axes.transData))
-                        if '3.1.0' <= matplotlib.__version__ <= '3.1.2':
-                            outline_path = remove_path_dupes(outline_path)
-                    # Inline must be within the map.
-                    if ((lonlat == 'lon' and self.x_inline) or
-                            (lonlat == 'lat' and self.y_inline)):
-                        # TODO: When Matplotlib clip path works on text, this
-                        # clipping can be left to it.
-                        if outline_path.contains_point(center):
-                            visible = True
-                    # Non-inline must not run through the outline.
-                    elif not outline_path.intersects_path(this_path):
-                        # Update the side location with spines if possible
-                        visible = True
-
-                    # Good
-                    if visible:
-                        break
-
-                if ((self.x_inline and lonlat == 'lon') or
-                        (self.y_inline and lonlat == 'lat')):
-                    break
-
-            # Updates
-            if loc is not None:
-                artist.update(self._get_alignments_from_loc(loc))
-                for side in 'left', 'right', 'top', 'bottom':
-                    artists = getattr(self, side+'_label_artists')
-                    sartists = set(artists)
-                    artists.clear()
-                    if side == loc:
-                        sartists = sartists | {artist}
-                    else:
-                        sartists = sartists - {artist}
-                    artists.extend(sartists)
-            artist.set_visible(visible)
-            if not visible:
-                artist.update(orig_specs)
-            else:
-                paths.append(this_path)
 
     def _assert_can_draw_ticks(self):
         """
