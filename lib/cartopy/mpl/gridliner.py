@@ -580,7 +580,6 @@ class Gridliner(object):
             return
         self._assert_can_draw_ticks()
 
-        outline_path = None
         delta_angle = 22.5
         max_delta_angle = 45
         spines_specs = {
@@ -610,12 +609,12 @@ class Gridliner(object):
 
         # Get the real map boundaries
         self.axes.spines["geo"].get_tightbbox(renderer)  # update coords
-        map_boundary_path = self.axes.spines["geo"].get_path()
+        map_boundary_path = self.axes.spines["geo"].get_path().transformed(
+            self.axes.spines["geo"].get_transform())
         map_boundary_vertices = map_boundary_path.vertices
         map_boundary = sgeom.Polygon(map_boundary_vertices)
-        outline_path = map_boundary_path.transformed(self.axes.transData)
         if '3.1.0' <= matplotlib.__version__ <= '3.1.2':
-            outline_path = remove_path_dupes(outline_path)
+            map_boundary_path = remove_path_dupes(map_boundary_path)
 
         if self.x_inline:
             y_midpoints = self._find_midpoints(lat_lim, lat_ticks)
@@ -636,8 +635,7 @@ class Gridliner(object):
 
             for line, tick_value in zip(lines, line_ticks):
                 # Intersection of line with map boundary
-                line = self.axes.projection.transform_points(
-                    crs, line[:, 0], line[:, 1])[:, :2]
+                line = self._crs_transform().transform(line)
                 infs = np.isinf(line).any(axis=1)
                 line = line.compress(~infs, axis=0)
                 if line.size == 0:
@@ -719,6 +717,9 @@ class Gridliner(object):
                             kw.update(label_style,
                                       bbox={'pad': 0, 'visible': False})
 
+                            # Get x and y in data coords
+                            pt0 = self.axes.transData.inverted(
+                                ).transform_point(pt0)
                             if y_inline:
                                 # 180 degrees isn't formatted with a
                                 # suffix and adds confusion if it's inline
@@ -796,22 +797,22 @@ class Gridliner(object):
                                     visible = False
                                     break
 
-                                center = artist.get_transform(
-                                    ).transform_point(artist.get_position())
-
                                 # Check that it does not overlap the map
                                 # Inline must be within the map.
                                 if x_inline or y_inline:
                                     # TODO: When Matplotlib clip path
                                     # works on text, this
                                     # clipping can be left to it.
-                                    if outline_path.contains_point(center):
-                                        visible = True
+                                    center = artist.get_transform(
+                                        ).transform_point(
+                                            artist.get_position())
+                                    visible = (map_boundary_path
+                                               .contains_point(center))
                                     loc = 'inline'
                                 # Non-inline must not run through the outline.
-                                elif not outline_path.intersects_path(
+                                elif map_boundary_path.intersects_path(
                                         this_path):
-                                    visible = True
+                                    visible = False
 
                                 # Good
                                 if visible:
