@@ -631,8 +631,6 @@ class Gridliner(object):
                         for i, (pt0, pt1) in enumerate([tail, head]):
                             kw, angle, loc = self._segment_to_text_specs(
                                 pt0, pt1, lonlat)
-                            # if not self._draw_this_label(lonlat, loc):
-                            #     continue
                             kw.update(label_style,
                                       bbox={'pad': 0, 'visible': False})
                             text = formatter(tick_value)
@@ -666,7 +664,6 @@ class Gridliner(object):
                                         ((lonlat == 'lat') and
                                          loc in ('left', 'right')))
                             self._labels.append((lonlat, priority, tt))
-                            # getattr(self, loc + '_label_artists').append(tt)
 
         # Sort labels
         if self._labels:
@@ -754,7 +751,7 @@ class Gridliner(object):
         return kw, loc
 
     def _get_loc_from_spines(self, spines_specs, label_path):
-        """Try to get the location from side spines and laebl path
+        """Try to get the location from side spines and label path
 
         For instance, for each side, if any of label_path x coordinates
         are beyond this side, the distance to this side is computed.
