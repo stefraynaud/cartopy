@@ -47,8 +47,8 @@ using the `setup.py` file::
 Required dependencies
 ~~~~~~~~~~~~~~~~~~~~~
 In order to install Cartopy, or to access its basic functionality, it will be
-necessary to first install **GEOS**, **NumPy**, **Cython**, **Shapely**,
-**pyshp** and **six**. Many of these packages can be installed using pip or
+necessary to first install **GEOS**, **NumPy**, **Cython**, **Shapely**, and
+**pyshp**. Many of these packages can be installed using pip or
 other package managers such as apt-get (Linux) and brew (macOS). Many of these
 dependencies are built as part of Cartopy's conda distribution, and the recipes
 for these packages can be found at https://github.com/conda-forge/feedstocks.
@@ -56,10 +56,20 @@ for these packages can be found at https://github.com/conda-forge/feedstocks.
 For macOS, the required dependencies can be installed in the following way::
 
     brew install proj geos
-    pip3 install --upgrade cython numpy pyshp six
+    pip3 install --upgrade cython numpy pyshp
     # shapely needs to be built from source to link to geos. If it is already
     # installed, uninstall it by: pip3 uninstall shapely
     pip3 install shapely --no-binary shapely
+
+Still on macOS, make sure you have installed pkg-config and set the
+`PKG_CONFIG_PATH` environment variable as follows
+
+    brew install pkg-config
+    export PKG_CONFIG_PATH=/usr/local/bin/pkgconfig
+
+Then you can install cartopy using
+
+    pip3 install cartopy
 
 If you are installing dependencies with a package manager on Linux, you may
 need to install the development packages (look for a "-dev" or "-devel" suffix) in addition
@@ -67,7 +77,7 @@ to the core packages.
 
 Further information about the required dependencies can be found here:
 
-**Python** 2.7 or later (https://www.python.org/)
+**Python** 3.5 or later (https://www.python.org/)
 
 **Cython** 0.28 or later (https://pypi.python.org/pypi/Cython/)
 
@@ -88,9 +98,6 @@ Further information about the required dependencies can be found here:
 
 **PROJ** 4.9.0 or later (https://proj4.org/)
     Cartographic Projections library.
-
-**six** 1.3.0 or later (https://pypi.python.org/pypi/six)
-    Python 2 and 3 compatibility.
 
 Optional Dependencies
 ~~~~~~~~~~~~~~~~~~~~~
@@ -131,12 +138,8 @@ Testing Dependencies
 ~~~~~~~~~~~~~~~~~~~~
 These packages are required for the full Cartopy test suite to run.
 
-**filelock** (https://filelock.readthedocs.io/)
+**flufl.lock** (https://flufllock.readthedocs.io/)
     A platform independent file lock for Python.
-
-**mock** 1.0.1 (https://pypi.python.org/pypi/mock/)
-    Python mocking and patching package for testing. Note that this package
-    is only required to support the Cartopy unit tests.
 
 **pytest** 3.1.0 or later (https://docs.pytest.org/en/latest/)
     Python package for software testing.

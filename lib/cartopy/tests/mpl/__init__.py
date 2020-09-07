@@ -1,31 +1,17 @@
-# (C) British Crown Copyright 2011 - 2019, Met Office
+# Copyright Cartopy Contributors
 #
-# This file is part of cartopy.
-#
-# cartopy is free software: you can redistribute it and/or modify it under
-# the terms of the GNU Lesser General Public License as published by the
-# Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# cartopy is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Lesser General Public License for more details.
-#
-# You should have received a copy of the GNU Lesser General Public License
-# along with cartopy.  If not, see <https://www.gnu.org/licenses/>.
-
-from __future__ import (absolute_import, division, print_function)
+# This file is part of Cartopy and is released under the LGPL license.
+# See COPYING and COPYING.LESSER in the root of the repository for full
+# licensing details.
 
 import base64
-import contextlib
 import distutils
 import os
 import glob
 import shutil
 import warnings
 
-import filelock
+import flufl.lock
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
@@ -36,7 +22,7 @@ import matplotlib.testing.compare as mcompare
 MPL_VERSION = distutils.version.LooseVersion(mpl.__version__)
 
 
-class ImageTesting(object):
+class ImageTesting:
     """
     Provides a convenient class for running visual Matplotlib tests.
 
@@ -85,7 +71,7 @@ class ImageTesting(object):
     image_output_directory = os.path.join(root_image_results, 'output')
     if not os.access(image_output_directory, os.W_OK):
         if not os.access(os.getcwd(), os.W_OK):
-            raise IOError('Write access to a local disk is required to run '
+            raise OSError('Write access to a local disk is required to run '
                           'image tests.  Run the tests from a current working '
                           'directory you have write access to to avoid this '
                           'issue.')
@@ -157,7 +143,7 @@ class ImageTesting(object):
             if not os.path.isdir(os.path.dirname(result_path)):
                 os.makedirs(os.path.dirname(result_path))
 
-            with filelock.FileLock(result_path + '.lock').acquire():
+            with flufl.lock.Lock(result_path + '.lock'):
                 self.save_figure(figure, result_path)
                 self.do_compare(result_path, expected_path, self.tolerance)
 
@@ -217,14 +203,7 @@ class ImageTesting(object):
                               (mod_name, test_name))
                 plt.close('all')
 
-            if MPL_VERSION >= '2':
-                style_context = mpl.style.context
-            else:
-                @contextlib.contextmanager
-                def style_context(style, after_reset=False):
-                    yield
-
-            with style_context(self.style):
+            with mpl.style.context(self.style):
                 if MPL_VERSION >= '3.2.0':
                     mpl.rcParams['text.kerning_factor'] = 6
 

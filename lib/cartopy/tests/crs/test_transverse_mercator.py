@@ -1,25 +1,12 @@
-# (C) British Crown Copyright 2013 - 2019, Met Office
+# Copyright Cartopy Contributors
 #
-# This file is part of cartopy.
-#
-# cartopy is free software: you can redistribute it and/or modify it under
-# the terms of the GNU Lesser General Public License as published by the
-# Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# cartopy is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Lesser General Public License for more details.
-#
-# You should have received a copy of the GNU Lesser General Public License
-# along with cartopy.  If not, see <https://www.gnu.org/licenses/>.
+# This file is part of Cartopy and is released under the LGPL license.
+# See COPYING and COPYING.LESSER in the root of the repository for full
+# licensing details.
 """
 Tests for the Transverse Mercator projection, including OSGB and OSNI.
 
 """
-
-from __future__ import (absolute_import, division, print_function)
 
 import numpy as np
 import pytest
@@ -28,7 +15,7 @@ import cartopy.crs as ccrs
 
 
 @pytest.mark.parametrize('approx', [True, False])
-class TestTransverseMercator(object):
+class TestTransverseMercator:
     def setup_class(self):
         self.point_a = (-3.474083, 50.727301)
         self.point_b = (0.5, 50.5)
@@ -70,7 +57,7 @@ class TestTransverseMercator(object):
         assert np.all(np.isnan(res))
 
 
-class TestOSGB(object):
+class TestOSGB:
     def setup_class(self):
         self.point_a = (-3.474083, 50.727301)
         self.point_b = (0.5, 50.5)
@@ -95,7 +82,7 @@ class TestOSGB(object):
         assert np.all(np.isnan(res))
 
 
-class TestOSNI(object):
+class TestOSNI:
     def setup_class(self):
         self.point_a = (-6.826286, 54.725116)
         self.src_crs = ccrs.PlateCarree()

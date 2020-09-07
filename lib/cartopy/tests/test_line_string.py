@@ -1,21 +1,8 @@
-# (C) British Crown Copyright 2011 - 2019, Met Office
+# Copyright Cartopy Contributors
 #
-# This file is part of cartopy.
-#
-# cartopy is free software: you can redistribute it and/or modify it under
-# the terms of the GNU Lesser General Public License as published by the
-# Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# cartopy is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Lesser General Public License for more details.
-#
-# You should have received a copy of the GNU Lesser General Public License
-# along with cartopy.  If not, see <https://www.gnu.org/licenses/>.
-
-from __future__ import (absolute_import, division, print_function)
+# This file is part of Cartopy and is released under the LGPL license.
+# See COPYING and COPYING.LESSER in the root of the repository for full
+# licensing details.
 
 import itertools
 import time
@@ -27,7 +14,7 @@ import shapely.geometry as sgeom
 import cartopy.crs as ccrs
 
 
-class TestLineString(object):
+class TestLineString:
     def test_out_of_bounds(self):
         # Check that a line that is completely out of the map boundary produces
         # a valid LineString
@@ -108,7 +95,7 @@ class FakeProjection(ccrs.PlateCarree):
                                  (-w + self.left_offset, -h)])
 
 
-class TestBisect(object):
+class TestBisect:
     # A bunch of tests to check the bisection algorithm is robust for a
     # variety of simple and/or pathological cases.
 
@@ -208,7 +195,7 @@ class TestBisect(object):
                     'Unexpected NaN in projected coords.'
 
 
-class TestMisc(object):
+class TestMisc:
     def test_misc(self):
         projection = ccrs.TransverseMercator(central_longitude=-90,
                                              approx=False)
@@ -242,7 +229,7 @@ class TestMisc(object):
         assert len(multi_line_string) > 0
 
 
-class TestSymmetry(object):
+class TestSymmetry:
     @pytest.mark.xfail
     def test_curve(self):
         # Obtain a simple, curved path.

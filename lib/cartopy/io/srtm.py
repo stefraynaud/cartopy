@@ -1,19 +1,8 @@
-# (C) British Crown Copyright 2011 - 2019, Met Office
+# Copyright Cartopy Contributors
 #
-# This file is part of cartopy.
-#
-# cartopy is free software: you can redistribute it and/or modify it under
-# the terms of the GNU Lesser General Public License as published by the
-# Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# cartopy is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Lesser General Public License for more details.
-#
-# You should have received a copy of the GNU Lesser General Public License
-# along with cartopy.  If not, see <https://www.gnu.org/licenses/>.
+# This file is part of Cartopy and is released under the LGPL license.
+# See COPYING and COPYING.LESSER in the root of the repository for full
+# licensing details.
 
 """
 The Shuttle Radar Topography Mission (SRTM) is an international research
@@ -25,13 +14,11 @@ database of Earth prior to the release of the ASTER GDEM in 2009.
 
 """
 
-from __future__ import (absolute_import, division, print_function)
-
+import io
 import os
 import warnings
 
 import numpy as np
-import six
 
 from cartopy import config
 import cartopy.crs as ccrs
@@ -205,8 +192,8 @@ class SRTM3Source(_SRTMSource):
             producing a taller composite for this RasterSource.
 
         """
-        super(SRTM3Source, self).__init__(resolution=3, downloader=downloader,
-                                          max_nx=max_nx, max_ny=max_ny)
+        super().__init__(resolution=3, downloader=downloader,
+                         max_nx=max_nx, max_ny=max_ny)
 
 
 class SRTM1Source(_SRTMSource):
@@ -232,8 +219,8 @@ class SRTM1Source(_SRTMSource):
             producing a taller composite for this RasterSource.
 
         """
-        super(SRTM1Source, self).__init__(resolution=1, downloader=downloader,
-                                          max_nx=max_nx, max_ny=max_ny)
+        super().__init__(resolution=1, downloader=downloader,
+                         max_nx=max_nx, max_ny=max_ny)
 
 
 def srtm(lon, lat):
@@ -443,7 +430,7 @@ class SRTMDownloader(Downloader):
 
         if SRTMDownloader._SRTM_LOOKUP_MASK[lon, colat]:
             return (SRTMDownloader._SRTM_BASE_URL +
-                    u'{y}{x}.SRTMGL{resolution}.hgt.zip').format(**format_dict)
+                    '{y}{x}.SRTMGL{resolution}.hgt.zip').format(**format_dict)
         else:
             return None
 
@@ -457,9 +444,9 @@ class SRTMDownloader(Downloader):
         url = self.url(format_dict)
 
         srtm_online = self._urlopen(url)
-        zfh = ZipFile(six.BytesIO(srtm_online.read()), 'r')
+        zfh = ZipFile(io.BytesIO(srtm_online.read()), 'r')
 
-        zip_member_path = u'{y}{x}.hgt'.format(**format_dict)
+        zip_member_path = '{y}{x}.hgt'.format(**format_dict)
         member = zfh.getinfo(zip_member_path)
         with open(target_path, 'wb') as fh:
             fh.write(zfh.open(member).read())
@@ -490,7 +477,7 @@ class SRTMDownloader(Downloader):
         # dependencies of cartopy.
         from bs4 import BeautifulSoup
         if filename is None:
-            from six.moves.urllib.request import urlopen
+            from urllib.request import urlopen
             url = SRTMDownloader._SRTM_BASE_URL.format(resolution=resolution)
             with urlopen(url) as f:
                 html = f.read()

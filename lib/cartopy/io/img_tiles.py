@@ -1,19 +1,8 @@
-# (C) British Crown Copyright 2011 - 2019, Met Office
+# Copyright Cartopy Contributors
 #
-# This file is part of cartopy.
-#
-# cartopy is free software: you can redistribute it and/or modify it under
-# the terms of the GNU Lesser General Public License as published by the
-# Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# cartopy is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Lesser General Public License for more details.
-#
-# You should have received a copy of the GNU Lesser General Public License
-# along with cartopy.  If not, see <https://www.gnu.org/licenses/>.
+# This file is part of Cartopy and is released under the LGPL license.
+# See COPYING and COPYING.LESSER in the root of the repository for full
+# licensing details.
 
 """
 Implements image tile identification and fetching from various sources.
@@ -24,26 +13,24 @@ The Matplotlib interface can make use of tile objects (defined below) via the
 :class:`MapQuest Open Aerial tileset <MapQuestOpenAerial>` to an existing axes
 at zoom level 2, do ``ax.add_image(MapQuestOpenAerial(), 2)``. An example of
 using tiles in this way can be found at the
-:ref:`sphx_glr_gallery_eyja_volcano.py` example.
+:ref:`sphx_glr_gallery_scalar_data_eyja_volcano.py` example.
 
 """
 
-from __future__ import (absolute_import, division, print_function)
-
 from abc import ABCMeta, abstractmethod
 import concurrent.futures
+import io
 import warnings
 
 from PIL import Image
 import shapely.geometry as sgeom
 import numpy as np
-import six
 
 import cartopy
 import cartopy.crs as ccrs
 
 
-class GoogleWTS(six.with_metaclass(ABCMeta, object)):
+class GoogleWTS(metaclass=ABCMeta):
     """
     Implement web tile retrieval using the Google WTS coordinate system.
 
@@ -68,7 +55,7 @@ class GoogleWTS(six.with_metaclass(ABCMeta, object)):
         def fetch_tile(tile):
             try:
                 img, extent, origin = self.get_image(tile)
-            except IOError:
+            except OSError:
                 # Some services 404 for tiles that aren't supposed to be
                 # there (e.g. out of range).
                 raise
@@ -86,7 +73,7 @@ class GoogleWTS(six.with_metaclass(ABCMeta, object)):
                 try:
                     img, x, y, origin = future.result()
                     tiles.append([img, x, y, origin])
-                except IOError:
+                except OSError:
                     pass
 
         img, extent, origin = _merge_tiles(tiles)
@@ -107,9 +94,8 @@ class GoogleWTS(six.with_metaclass(ABCMeta, object)):
                 yield start_tile
             else:
                 for tile in self._subtiles(start_tile):
-                    for result in self._find_images(target_domain, target_z,
-                                                    start_tile=tile):
-                        yield result
+                    yield from self._find_images(target_domain, target_z,
+                                                 start_tile=tile)
 
     find_images = _find_images
 
@@ -180,16 +166,13 @@ class GoogleWTS(six.with_metaclass(ABCMeta, object)):
         pass
 
     def get_image(self, tile):
-        if six.PY3:
-            from urllib.request import urlopen, Request, HTTPError, URLError
-        else:
-            from urllib2 import urlopen, Request, HTTPError, URLError
+        from urllib.request import urlopen, Request, HTTPError, URLError
 
         url = self._image_url(tile)
         try:
             request = Request(url, headers={"User-Agent": self.user_agent})
             fh = urlopen(request)
-            im_data = six.BytesIO(fh.read())
+            im_data = io.BytesIO(fh.read())
             fh.close()
             img = Image.open(im_data)
 
@@ -236,8 +219,7 @@ World_Shaded_Relief/MapServer/tile/{z}/{y}/{x}.jpg'``
                 not Image.core.jpeg_decoder:
             msg = "The '%s' style requires pillow with jpeg decoding support."
             raise ValueError(msg % self.style)
-        return super(GoogleTiles, self).__init__(
-            desired_tile_form=desired_tile_form)
+        return super().__init__(desired_tile_form=desired_tile_form)
 
     def _image_url(self, tile):
         style_dict = {
@@ -260,7 +242,7 @@ class MapQuestOSM(GoogleWTS):
     # this now requires a sign up to a plan
     def _image_url(self, tile):
         x, y, z = tile
-        url = 'https://otile1.mqcdn.com/tiles/1.0.0/osm/%s/%s/%s.jpg' % (
+        url = 'https://otile1.mqcdn.com/tiles/1.0.0/osm/{}/{}/{}.jpg'.format(
             z, x, y)
         mqdevurl = ('https://devblog.mapquest.com/2016/06/15/'
                     'modernization-of-mapquest-results-in-changes'
@@ -277,7 +259,7 @@ class MapQuestOpenAerial(GoogleWTS):
     #  Farm Service Agency"
     def _image_url(self, tile):
         x, y, z = tile
-        url = 'https://oatile1.mqcdn.com/tiles/1.0.0/sat/%s/%s/%s.jpg' % (
+        url = 'https://oatile1.mqcdn.com/tiles/1.0.0/sat/{}/{}/{}.jpg'.format(
             z, x, y)
         return url
 
@@ -287,7 +269,7 @@ class OSM(GoogleWTS):
 
     def _image_url(self, tile):
         x, y, z = tile
-        url = 'https://a.tile.openstreetmap.org/%s/%s/%s.png' % (z, x, y)
+        url = 'https://a.tile.openstreetmap.org/{}/{}/{}.png'.format(z, x, y)
         return url
 
 
@@ -312,7 +294,7 @@ class Stamen(GoogleWTS):
 
     """
     def __init__(self, style='toner', desired_tile_form='RGB'):
-        super(Stamen, self).__init__(desired_tile_form=desired_tile_form)
+        super().__init__(desired_tile_form=desired_tile_form)
         self.style = style
 
     def _image_url(self, tile):
@@ -355,7 +337,7 @@ class StamenTerrain(Stamen):
         # NOTE: This subclass of Stamen exists for legacy reasons.
         # No further Stamen subclasses will be accepted as
         # they can easily be created in user code with Stamen(style_name).
-        return super(StamenTerrain, self).__init__(style='terrain-background')
+        return super().__init__(style='terrain-background')
 
 
 class MapboxTiles(GoogleWTS):
@@ -383,7 +365,7 @@ class MapboxTiles(GoogleWTS):
         """
         self.access_token = access_token
         self.map_id = map_id
-        super(MapboxTiles, self).__init__()
+        super().__init__()
 
     def _image_url(self, tile):
         x, y, z = tile
@@ -426,7 +408,7 @@ class MapboxStyleTiles(GoogleWTS):
         self.access_token = access_token
         self.username = username
         self.map_id = map_id
-        super(MapboxStyleTiles, self).__init__()
+        super().__init__()
 
     def _image_url(self, tile):
         x, y, z = tile
@@ -474,8 +456,7 @@ class QuadtreeTiles(GoogleWTS):
     def quadkey_to_tms(self, quadkey, google=False):
         # algorithm ported from
         # https://msdn.microsoft.com/en-us/library/bb259689.aspx
-        assert isinstance(quadkey, six.string_types), \
-            'quadkey must be a string'
+        assert isinstance(quadkey, str), 'quadkey must be a string'
 
         x = y = 0
         z = len(quadkey)
@@ -552,13 +533,13 @@ class OrdnanceSurvey(GoogleWTS):
             The style of the Ordnance Survey map tiles. One of 'Outdoor',
             'Road', 'Light', 'Night', 'Leisure'. Defaults to 'Road'.
             Details about the style of layer can be found at:
-             - https://apidocs.os.uk/docs/layer-information
-             - https://apidocs.os.uk/docs/map-styles
+
+            - https://apidocs.os.uk/docs/layer-information
+            - https://apidocs.os.uk/docs/map-styles
         desired_tile_form: optional
             Defaults to 'RGB'.
         """
-        super(OrdnanceSurvey, self).__init__(
-            desired_tile_form=desired_tile_form)
+        super().__init__(desired_tile_form=desired_tile_form)
         self.apikey = apikey
 
         if layer not in ['Outdoor', 'Road', 'Light', 'Night', 'Leisure']:

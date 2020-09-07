@@ -1,22 +1,10 @@
-# (C) British Crown Copyright 2011 - 2020, Met Office
+# Copyright Cartopy Contributors
 #
-# This file is part of cartopy.
-#
-# cartopy is free software: you can redistribute it and/or modify it under
-# the terms of the GNU Lesser General Public License as published by the
-# Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# cartopy is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Lesser General Public License for more details.
-#
-# You should have received a copy of the GNU Lesser General Public License
-# along with cartopy.  If not, see <https://www.gnu.org/licenses/>.
+# This file is part of Cartopy and is released under the LGPL license.
+# See COPYING and COPYING.LESSER in the root of the repository for full
+# licensing details.
 """
 Provide shapely geometry <-> matplotlib path support.
-
 
 See also `Shapely Geometric Objects <see_also_shapely>`_
 and `Matplotlib Path API <https://matplotlib.org/api/path_api.html>`_.
@@ -25,8 +13,6 @@ and `Matplotlib Path API <https://matplotlib.org/api/path_api.html>`_.
    https://shapely.readthedocs.io/en/latest/manual.html#geometric-objects
 
 """
-
-from __future__ import (absolute_import, division, print_function)
 
 import numpy as np
 import matplotlib
