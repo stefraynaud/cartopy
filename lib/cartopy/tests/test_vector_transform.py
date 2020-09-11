@@ -1,21 +1,8 @@
-# (C) British Crown Copyright 2013 - 2017, Met Office
+# Copyright Cartopy Contributors
 #
-# This file is part of cartopy.
-#
-# cartopy is free software: you can redistribute it and/or modify it under
-# the terms of the GNU Lesser General Public License as published by the
-# Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# cartopy is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Lesser General Public License for more details.
-#
-# You should have received a copy of the GNU Lesser General Public License
-# along with cartopy.  If not, see <https://www.gnu.org/licenses/>.
-
-from __future__ import (absolute_import, division, print_function)
+# This file is part of Cartopy and is released under the LGPL license.
+# See COPYING and COPYING.LESSER in the root of the repository for full
+# licensing details.
 
 import numpy as np
 from numpy.testing import assert_array_equal, assert_array_almost_equal
@@ -40,7 +27,7 @@ def _sample_plate_carree_vector_field():
     return u, v
 
 
-class Test_interpolate_to_grid(object):
+class Test_interpolate_to_grid:
 
     @classmethod
     def setup_class(cls):
@@ -106,7 +93,7 @@ class Test_interpolate_to_grid(object):
         assert_array_almost_equal(s_grid3, expected_s_grid)
 
 
-class Test_vector_scalar_to_grid(object):
+class Test_vector_scalar_to_grid:
 
     @classmethod
     def setup_class(cls):

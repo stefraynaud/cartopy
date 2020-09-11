@@ -4,8 +4,6 @@
 # See COPYING and COPYING.LESSER in the root of the repository for full
 # licensing details.
 
-from __future__ import (absolute_import, division, print_function)
-
 import operator
 import warnings
 
@@ -27,7 +25,7 @@ degree_locator = mticker.MaxNLocator(nbins=9, steps=[1, 1.5, 1.8, 2, 3, 6, 10])
 classic_locator = mticker.MaxNLocator(nbins=9)
 classic_formatter = mticker.ScalarFormatter
 
-_DEGREE_SYMBOL = u'\u00B0'
+_DEGREE_SYMBOL = '\u00B0'
 _X_INLINE_PROJS = (
     cartopy.crs.InterruptedGoodeHomolosine,
     cartopy.crs.LambertConformal,
@@ -78,14 +76,14 @@ def _lat_hemisphere(latitude):
 
 
 def _east_west_formatted(longitude, num_format='g'):
-    fmt_string = u'{longitude:{num_format}}{degree}{hemisphere}'
+    fmt_string = '{longitude:{num_format}}{degree}{hemisphere}'
     return fmt_string.format(longitude=abs(longitude), num_format=num_format,
                              hemisphere=_lon_hemisphere(longitude),
                              degree=_DEGREE_SYMBOL)
 
 
 def _north_south_formatted(latitude, num_format='g'):
-    fmt_string = u'{latitude:{num_format}}{degree}{hemisphere}'
+    fmt_string = '{latitude:{num_format}}{degree}{hemisphere}'
     return fmt_string.format(latitude=abs(latitude), num_format=num_format,
                              hemisphere=_lat_hemisphere(latitude),
                              degree=_DEGREE_SYMBOL)
@@ -99,7 +97,7 @@ LATITUDE_FORMATTER = mticker.FuncFormatter(lambda v, pos:
                                            _north_south_formatted(v))
 
 
-class Gridliner(object):
+class Gridliner:
     # NOTE: In future, one of these objects will be add-able to a GeoAxes (and
     # maybe even a plain old mpl axes) and it will call the "_draw_gridliner"
     # method on draw. This will enable automatic gridline resolution
@@ -108,7 +106,7 @@ class Gridliner(object):
                  ylocator=None, collection_kwargs=None,
                  xformatter=None, yformatter=None, dms=False,
                  x_inline=None, y_inline=None, auto_inline=True,
-                 rotate_labels=True):
+                 xlim=None, ylim=None, rotate_labels=True):
         """
         Object used by :meth:`cartopy.mpl.geoaxes.GeoAxes.gridlines`
         to add gridlines and tick labels to a map.
@@ -166,6 +164,16 @@ class Gridliner(object):
             Toggle whether the y labels drawn should be inline.
         auto_inline: optional
             Set x_inline and y_inline automatically based on projection.
+        xlim: optional
+            Set a limit for the gridlines so that they do not go all the
+            way to the edge of the boundary. xlim can be a single number or
+            a (min, max) tuple. If a single number, the limits will be
+            (-xlim, +xlim).
+        ylim: optional
+            Set a limit for the gridlines so that they do not go all the
+            way to the edge of the boundary. ylim can be a single number or
+            a (min, max) tuple. If a single number, the limits will be
+            (-ylim, +ylim).
         rotate_labels: optional
             Allow the rotation of labels.
 
@@ -276,6 +284,11 @@ class Gridliner(object):
             self.y_inline = y_inline
         elif not auto_inline:
             self.y_inline = False
+
+        # Gridline limits so that the gridlines don't extend all the way
+        # to the edge of the boundary
+        self.xlim = xlim
+        self.ylim = ylim
 
         #: Whether to draw the x gridlines.
         self.xlines = True
@@ -745,7 +758,7 @@ class Gridliner(object):
             dy = xpadding * np.sin(angle * np.pi / 180)
             transform = mtrans.offset_copy(
                 self.axes.transData, self.axes.figure,
-                x=dx, y=dy, units='dots')
+                x=dx, y=dy, units='points')
             kw.update(transform=transform)
 
         return kw, loc
@@ -1007,5 +1020,21 @@ class Gridliner(object):
             prct = np.abs(np.diff(lon_range) / np.diff(crs.x_limits))
             if prct > 0.9:
                 lon_range = crs.x_limits
+
+        if self.xlim is not None:
+            if np.iterable(self.xlim):
+                # tuple, list or ndarray was passed in: (-140, 160)
+                lon_range = self.xlim
+            else:
+                # A single int/float was passed in: 140
+                lon_range = (-self.xlim, self.xlim)
+
+        if self.ylim is not None:
+            if np.iterable(self.ylim):
+                # tuple, list or ndarray was passed in: (-140, 160)
+                lat_range = self.ylim
+            else:
+                # A single int/float was passed in: 140
+                lat_range = (-self.ylim, self.ylim)
 
         return lon_range, lat_range

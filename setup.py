@@ -13,8 +13,8 @@ PYTHON_MIN_VERSION = (3, 5)
 
 if sys.version_info < PYTHON_MIN_VERSION:
     error = """
-Beginning with Cartopy 0.19, Python {0} or above is required.
-You are using Python {1}.
+Beginning with Cartopy 0.19, Python {} or above is required.
+You are using Python {}.
 
 This may be due to an out of date pip.
 
@@ -33,8 +33,6 @@ from distutils.spawn import find_executable
 from distutils.sysconfig import get_config_var
 
 from setuptools import Command, Extension, convert_path, setup
-
-import versioneer
 
 """
 Distribution definition for Cartopy.
@@ -147,14 +145,14 @@ def find_proj_version_by_program(conda=None):
     proj = find_executable('proj')
     if proj is None:
         print(
-            'Proj %s must be installed.' % (
-                '.'.join(str(v) for v in PROJ_MIN_VERSION), ),
+            'Proj {} must be installed.'.format(
+                '.'.join(str(v) for v in PROJ_MIN_VERSION)),
             file=sys.stderr)
         exit(1)
 
     if conda is not None and conda not in proj:
         print(
-            'Proj %s must be installed in Conda environment "%s".' % (
+            'Proj {} must be installed in Conda environment "{}".'.format(
                 '.'.join(str(v) for v in PROJ_MIN_VERSION), conda),
             file=sys.stderr)
         exit(1)
@@ -250,7 +248,7 @@ else:
 # Python dependencies
 extras_require = {}
 for name in os.listdir(os.path.join(HERE, 'requirements')):
-    with open(os.path.join(HERE, 'requirements', name), 'r') as fh:
+    with open(os.path.join(HERE, 'requirements', name)) as fh:
         section, ext = os.path.splitext(name)
         extras_require[section] = []
         for line in fh:
@@ -277,7 +275,7 @@ if not sys.platform.startswith('win'):
 
 # Description
 # ===========
-with open(os.path.join(HERE, 'README.md'), 'r') as fh:
+with open(os.path.join(HERE, 'README.md')) as fh:
     description = ''.join(fh.readlines())
 
 
@@ -347,19 +345,17 @@ def decythonize(extensions, **_ignore):
     return extensions
 
 
-cmdclass = versioneer.get_cmdclass()
-
 if IS_SDIST and not FORCE_CYTHON:
     extensions = decythonize(extensions)
+    cmdclass = {}
 else:
-    cmdclass.update({'build_ext': cy_build_ext})
+    cmdclass = {'build_ext': cy_build_ext}
 
 
 # Main setup
 # ==========
 setup(
     name='Cartopy',
-    version=versioneer.get_version(),
     url='https://scitools.org.uk/cartopy/docs/latest/',
     download_url='https://github.com/SciTools/cartopy',
     author='UK Met Office',
@@ -374,6 +370,11 @@ setup(
     install_requires=install_requires,
     extras_require=extras_require,
     tests_require=tests_require,
+
+    setup_requires=['setuptools_scm', 'setuptools_scm_git_archive'],
+    use_scm_version={
+        'write_to': 'lib/cartopy/_version.py',
+    },
 
     packages=find_package_tree('lib/cartopy', 'cartopy'),
     package_dir={'': 'lib'},
@@ -413,6 +414,7 @@ setup(
             'Programming Language :: Python :: 3.6',
             'Programming Language :: Python :: 3.7',
             'Programming Language :: Python :: 3.8',
+            'Programming Language :: Python :: 3 :: Only',
             'Topic :: Scientific/Engineering',
             'Topic :: Scientific/Engineering :: GIS',
             'Topic :: Scientific/Engineering :: Visualization',

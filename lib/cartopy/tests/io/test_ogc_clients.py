@@ -1,26 +1,10 @@
-# (C) British Crown Copyright 2011 - 2019, Met Office
+# Copyright Cartopy Contributors
 #
-# This file is part of cartopy.
-#
-# cartopy is free software: you can redistribute it and/or modify it under
-# the terms of the GNU Lesser General Public License as published by the
-# Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# cartopy is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Lesser General Public License for more details.
-#
-# You should have received a copy of the GNU Lesser General Public License
-# along with cartopy.  If not, see <https://www.gnu.org/licenses/>.
+# This file is part of Cartopy and is released under the LGPL license.
+# See COPYING and COPYING.LESSER in the root of the repository for full
+# licensing details.
 
-from __future__ import (absolute_import, division, print_function)
-
-try:
-    from unittest import mock
-except ImportError:
-    import mock
+from unittest import mock
 
 import numpy as np
 try:
@@ -43,7 +27,7 @@ RESOLUTION = (30, 30)
 
 @pytest.mark.network
 @pytest.mark.skipif(not _OWSLIB_AVAILABLE, reason='OWSLib is unavailable.')
-class TestWMSRasterSource(object):
+class TestWMSRasterSource:
     URI = 'http://vmap0.tiles.osgeo.org/wms/vmap0'
     layer = 'basic'
     layers = ['basic', 'ocean']
@@ -145,10 +129,11 @@ class TestWMSRasterSource(object):
         assert img.shape == (40, 20, 4)
 
 
+@pytest.mark.filterwarnings("ignore:TileMatrixLimits")
 @pytest.mark.network
 @pytest.mark.skipif(not _OWSLIB_AVAILABLE, reason='OWSLib is unavailable.')
 @pytest.mark.xfail(raises=KeyError, reason='OWSLib WMTS support is broken.')
-class TestWMTSRasterSource(object):
+class TestWMTSRasterSource:
     URI = 'https://map1c.vis.earthdata.nasa.gov/wmts-geo/wmts.cgi'
     layer_name = 'VIIRS_CityLights_2012'
     projection = ccrs.PlateCarree()
@@ -222,7 +207,7 @@ class TestWMTSRasterSource(object):
 
 @pytest.mark.network
 @pytest.mark.skipif(not _OWSLIB_AVAILABLE, reason='OWSLib is unavailable.')
-class TestWFSGeometrySource(object):
+class TestWFSGeometrySource:
     URI = 'https://nsidc.org/cgi-bin/atlas_south?service=WFS'
     typename = 'land_excluding_antarctica'
     native_projection = ccrs.Stereographic(central_latitude=-90,

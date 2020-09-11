@@ -1,27 +1,16 @@
-# (C) British Crown Copyright 2011 - 2020, Met Office
+# Copyright Cartopy Contributors
 #
-# This file is part of cartopy.
-#
-# cartopy is free software: you can redistribute it and/or modify it under
-# the terms of the GNU Lesser General Public License as published by the
-# Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# cartopy is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Lesser General Public License for more details.
-#
-# You should have received a copy of the GNU Lesser General Public License
-# along with cartopy.  If not, see <https://www.gnu.org/licenses/>.
-
-from __future__ import (absolute_import, division, print_function)
+# This file is part of Cartopy and is released under the LGPL license.
+# See COPYING and COPYING.LESSER in the root of the repository for full
+# licensing details.
 
 import os
 import types
 
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
+import matplotlib.colors as colors
 from PIL import Image
 import pytest
 import shapely.geometry as sgeom
@@ -30,7 +19,7 @@ from cartopy import config
 import cartopy.crs as ccrs
 import cartopy.io.img_tiles as cimgt
 
-from cartopy.tests.mpl import MPL_VERSION, ImageTesting
+from cartopy.tests.mpl import ImageTesting
 import cartopy.tests.test_img_tiles as ctest_tiles
 
 
@@ -44,20 +33,12 @@ REGIONAL_IMG = os.path.join(config['repo_data_dir'], 'raster', 'sample',
 # We have an exceptionally large tolerance for the web_tiles test.
 # The basemap changes on a regular basis (for seasons) and we really only
 # care that it is putting images onto the map which are roughly correct.
-if MPL_VERSION < '2':
-    web_tiles_tolerance = 12
-elif MPL_VERSION < '2.1.0':
-    web_tiles_tolerance = 4.6
-else:
-    web_tiles_tolerance = 5.4
-
-
 @pytest.mark.natural_earth
 @pytest.mark.network
 @pytest.mark.xfail(ccrs.PROJ4_VERSION == (5, 0, 0),
                    reason='Proj returns slightly different bounds.',
                    strict=True)
-@ImageTesting(['web_tiles'], tolerance=web_tiles_tolerance)
+@ImageTesting(['web_tiles'], tolerance=5.8)
 def test_web_tiles():
     extent = [-15, 0.1, 50, 60]
     target_domain = sgeom.Polygon([[extent[0], extent[1]],
@@ -96,8 +77,7 @@ def test_web_tiles():
 @pytest.mark.xfail(ccrs.PROJ4_VERSION == (5, 0, 0),
                    reason='Proj returns slightly different bounds.',
                    strict=True)
-@ImageTesting(['image_merge'],
-              tolerance=3.9 if MPL_VERSION < '2' else 0.01)
+@ImageTesting(['image_merge'], tolerance=0.01)
 def test_image_merge():
     # tests the basic image merging functionality
     tiles = []
@@ -126,8 +106,7 @@ def test_image_merge():
 @pytest.mark.xfail((5, 0, 0) <= ccrs.PROJ4_VERSION < (5, 1, 0),
                    reason='Proj Orthographic projection is buggy.',
                    strict=True)
-@ImageTesting(['imshow_natural_earth_ortho'],
-              tolerance=3.99 if MPL_VERSION < '2' else 0.7)
+@ImageTesting(['imshow_natural_earth_ortho'], tolerance=0.7)
 def test_imshow():
     source_proj = ccrs.PlateCarree()
     img = plt.imread(NATURAL_EARTH_IMG)
@@ -140,8 +119,7 @@ def test_imshow():
 
 
 @pytest.mark.natural_earth
-@ImageTesting(['imshow_regional_projected'],
-              tolerance=10.4 if MPL_VERSION < '2' else 0.8)
+@ImageTesting(['imshow_regional_projected'], tolerance=0.8)
 def test_imshow_projected():
     source_proj = ccrs.PlateCarree()
     img_extent = (-120.67660000000001, -106.32104523100001,
@@ -163,11 +141,39 @@ def test_imshow_wrapping():
     assert ax.get_xlim() == (-180, 180)
 
 
+def test_imshow_rgba():
+    # tests that the alpha of a RGBA array passed to imshow is set to 0
+    # instead of masked
+    z = np.ones((100, 100))*0.5
+    cmap = cm.get_cmap()
+    norm = colors.Normalize(vmin=0, vmax=1)
+    z1 = cmap(norm(z))
+    plt_crs = ccrs.LambertAzimuthalEqualArea()
+    latlon_crs = ccrs.PlateCarree()
+    ax = plt.axes(projection=plt_crs)
+    ax.set_extent([-30, -20, 60, 70], crs=latlon_crs)
+    img = ax.imshow(z1, extent=[-26, -24, 64, 66], transform=latlon_crs)
+    assert sum(img.get_array().data[:, 0, 3]) == 0
+    plt.close()
+
+
+def test_imshow_rgb():
+    # tests that the alpha of a RGB array passed to imshow is set to 0
+    # instead of masked
+    z = np.ones((100, 100, 3))*0.5
+    plt_crs = ccrs.LambertAzimuthalEqualArea()
+    latlon_crs = ccrs.PlateCarree()
+    ax = plt.axes(projection=plt_crs)
+    ax.set_extent([-30, -20, 60, 70], crs=latlon_crs)
+    img = ax.imshow(z, extent=[-26, -24, 64, 66], transform=latlon_crs)
+    assert sum(img.get_array().data[:, 0, 3]) == 0
+    plt.close()
+
+
 @pytest.mark.xfail((5, 0, 0) <= ccrs.PROJ4_VERSION < (5, 1, 0),
                    reason='Proj Orthographic projection is buggy.',
                    strict=True)
-@ImageTesting(['imshow_natural_earth_ortho'],
-              tolerance=4.19 if MPL_VERSION < '2' else 0.7)
+@ImageTesting(['imshow_natural_earth_ortho'], tolerance=0.7)
 def test_stock_img():
     ax = plt.axes(projection=ccrs.Orthographic())
     ax.stock_img()
@@ -176,8 +182,7 @@ def test_stock_img():
 @pytest.mark.xfail((5, 0, 0) <= ccrs.PROJ4_VERSION < (5, 1, 0),
                    reason='Proj Orthographic projection is buggy.',
                    strict=True)
-@ImageTesting(['imshow_natural_earth_ortho'],
-              tolerance=3.99 if MPL_VERSION < '2' else 0.7)
+@ImageTesting(['imshow_natural_earth_ortho'], tolerance=0.7)
 def test_pil_Image():
     img = Image.open(NATURAL_EARTH_IMG)
     source_proj = ccrs.PlateCarree()
@@ -189,8 +194,27 @@ def test_pil_Image():
 @pytest.mark.xfail((5, 0, 0) <= ccrs.PROJ4_VERSION < (5, 1, 0),
                    reason='Proj Orthographic projection is buggy.',
                    strict=True)
-@ImageTesting(['imshow_natural_earth_ortho'],
-              tolerance=4.2 if MPL_VERSION < '2' else 0.5)
+@ImageTesting(['imshow_natural_earth_ortho'])
 def test_background_img():
     ax = plt.axes(projection=ccrs.Orthographic())
     ax.background_img(name='ne_shaded', resolution='low')
+
+
+def test_alpha_2d_warp():
+    # tests that both image and alpha arrays (if alpha is 2D) are warped
+    plt_crs = ccrs.Geostationary(central_longitude=-155.)
+    fig = plt.figure(figsize=(5, 5))
+    ax = fig.add_subplot(1, 1, 1, projection=plt_crs)
+    latlon_crs = ccrs.PlateCarree()
+    coords = [-162., -148., 17.5, 23.]
+    ax.set_extent(coords, crs=latlon_crs)
+    fake_data = np.zeros([100, 100])
+    fake_alphas = np.zeros(fake_data.shape)
+    image = ax.imshow(fake_data, extent=coords, transform=latlon_crs,
+                      alpha=fake_alphas)
+    plt.close()
+    image_data = image.get_array()
+    image_alpha = image.get_alpha()
+
+    assert image_data.shape == image_alpha.shape
+    plt.close()

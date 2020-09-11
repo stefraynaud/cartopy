@@ -1,27 +1,14 @@
-# (C) British Crown Copyright 2011 - 2020, Met Office
+# Copyright Cartopy Contributors
 #
-# This file is part of cartopy.
-#
-# cartopy is free software: you can redistribute it and/or modify it under
-# the terms of the GNU Lesser General Public License as published by the
-# Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# cartopy is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Lesser General Public License for more details.
-#
-# You should have received a copy of the GNU Lesser General Public License
-# along with cartopy.  If not, see <https://www.gnu.org/licenses/>.
+# This file is part of Cartopy and is released under the LGPL license.
+# See COPYING and COPYING.LESSER in the root of the repository for full
+# licensing details.
 
 """
 Provides a collection of sub-packages for loading, saving and retrieving
 various data formats.
 
 """
-
-from __future__ import (absolute_import, division, print_function)
 
 import collections
 import os
@@ -77,7 +64,7 @@ class DownloadWarning(Warning):
     pass
 
 
-class Downloader(object):
+class Downloader:
     """
     Represents a resource, that can be configured easily, which knows
     how to acquire itself (perhaps via HTTP).
@@ -320,7 +307,7 @@ class LocatedImage(collections.namedtuple('LocatedImage', 'image, extent')):
     """
 
 
-class RasterSource(object):
+class RasterSource:
     """
     Define the cartopy raster fetching interface.
 
@@ -420,11 +407,11 @@ class PostprocessedRasterSource(RasterSourceContainer):
             return a single LocatedImage.
 
         """
-        super(PostprocessedRasterSource, self).__init__(contained_source)
+        super().__init__(contained_source)
         self._post_fetch_fn = img_post_process
 
     def fetch_raster(self, *args, **kwargs):
-        fetch_raster = super(PostprocessedRasterSource, self).fetch_raster
+        fetch_raster = super().fetch_raster
         located_imgs = fetch_raster(*args, **kwargs)
         if located_imgs:
             located_imgs = [self._post_fetch_fn(img) for img in located_imgs]

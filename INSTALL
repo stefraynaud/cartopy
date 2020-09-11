@@ -61,6 +61,16 @@ For macOS, the required dependencies can be installed in the following way::
     # installed, uninstall it by: pip3 uninstall shapely
     pip3 install shapely --no-binary shapely
 
+Still on macOS, make sure you have installed pkg-config and set the
+`PKG_CONFIG_PATH` environment variable as follows
+
+    brew install pkg-config
+    export PKG_CONFIG_PATH=/usr/local/bin/pkgconfig
+
+Then you can install cartopy using
+
+    pip3 install cartopy
+
 If you are installing dependencies with a package manager on Linux, you may
 need to install the development packages (look for a "-dev" or "-devel" suffix) in addition
 to the core packages.
@@ -128,12 +138,8 @@ Testing Dependencies
 ~~~~~~~~~~~~~~~~~~~~
 These packages are required for the full Cartopy test suite to run.
 
-**filelock** (https://filelock.readthedocs.io/)
+**flufl.lock** (https://flufllock.readthedocs.io/)
     A platform independent file lock for Python.
-
-**mock** 1.0.1 (https://pypi.python.org/pypi/mock/)
-    Python mocking and patching package for testing. Note that this package
-    is only required to support the Cartopy unit tests.
 
 **pytest** 3.1.0 or later (https://docs.pytest.org/en/latest/)
     Python package for software testing.

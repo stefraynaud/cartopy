@@ -1,19 +1,8 @@
-# (C) British Crown Copyright 2014 - 2020, Met Office
+# Copyright Cartopy Contributors
 #
-# This file is part of cartopy.
-#
-# cartopy is free software: you can redistribute it and/or modify it under
-# the terms of the GNU Lesser General Public License as published by the
-# Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# cartopy is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Lesser General Public License for more details.
-#
-# You should have received a copy of the GNU Lesser General Public License
-# along with cartopy.  If not, see <https://www.gnu.org/licenses/>.
+# This file is part of Cartopy and is released under the LGPL license.
+# See COPYING and COPYING.LESSER in the root of the repository for full
+# licensing details.
 """
 Implements RasterSource classes which can retrieve imagery from web services
 such as WMS and WMTS.
@@ -23,12 +12,9 @@ The matplotlib interface can make use of RasterSources via the
 with additional specific methods which make use of this for WMS and WMTS
 (:meth:`~cartopy.mpl.geoaxes.GeoAxes.add_wms` and
 :meth:`~cartopy.mpl.geoaxes.GeoAxes.add_wmts`). An example of using WMTS in
-this way can be found at :ref:`sphx_glr_gallery_wmts.py`.
-
+this way can be found at :ref:`sphx_glr_gallery_web_services_wmts.py`.
 
 """
-
-from __future__ import (absolute_import, division, print_function)
 
 import collections
 import io
@@ -420,9 +406,9 @@ class WMTSRasterSource(RasterSource):
                         break
                 if matrix_set_name is None:
                     # Fail completely.
-                    available_urns = sorted(set(
+                    available_urns = sorted({
                         self.wmts.tilematrixsets[name].crs
-                        for name in matrix_set_names))
+                        for name in matrix_set_names})
                     msg = 'Unable to find tile matrix for projection.'
                     msg += '\n    Projection: ' + str(target_projection)
                     msg += '\n    Available tile CRS URNs:'
@@ -635,7 +621,7 @@ class WMTSRasterSource(RasterSource):
         return big_img, img_extent
 
 
-class WFSGeometrySource(object):
+class WFSGeometrySource:
     """Web Feature Service (WFS) retrieval for Cartopy."""
 
     def __init__(self, service, features, getfeature_extra_kwargs=None):
@@ -686,8 +672,8 @@ class WFSGeometrySource(object):
         """
         # Using first element in crsOptions (default).
         if self._default_urn is None:
-            default_urn = set(self.service.contents[feature].crsOptions[0] for
-                              feature in self.features)
+            default_urn = {self.service.contents[feature].crsOptions[0] for
+                           feature in self.features}
             if len(default_urn) != 1:
                 ValueError('Failed to find a single common default SRS '
                            'across all features (typenames).')

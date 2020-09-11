@@ -1,32 +1,18 @@
-# (C) British Crown Copyright 2011 - 2019, Met Office
+# Copyright Cartopy Contributors
 #
-# This file is part of cartopy.
-#
-# cartopy is free software: you can redistribute it and/or modify it under
-# the terms of the GNU Lesser General Public License as published by the
-# Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# cartopy is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Lesser General Public License for more details.
-#
-# You should have received a copy of the GNU Lesser General Public License
-# along with cartopy.  If not, see <https://www.gnu.org/licenses/>.
-
-from __future__ import (absolute_import, division, print_function)
+# This file is part of Cartopy and is released under the LGPL license.
+# See COPYING and COPYING.LESSER in the root of the repository for full
+# licensing details.
 
 import numpy as np
 import pytest
 import shapely.geometry as sgeom
 import shapely.wkt
 
-
 import cartopy.crs as ccrs
 
 
-class TestBoundary(object):
+class TestBoundary:
     def test_no_polygon_boundary_reversal(self):
         # Check that polygons preserve their clockwise or counter-clockwise
         # ordering when they are attached to the boundary.
@@ -71,7 +57,7 @@ class TestBoundary(object):
             assert len(multi_polygon) == expected_polys
 
 
-class TestMisc(object):
+class TestMisc:
     def test_misc(self):
         projection = ccrs.TransverseMercator(central_longitude=-90,
                                              approx=False)
@@ -261,8 +247,43 @@ class TestMisc(object):
 
         assert abs(1200 - projected.area) < 1e-5
 
+    def test_attach_short_loop(self):
+        # Geometry comes from a matplotlib contourf.
+        mstring = shapely.wkt.loads(
+            'MULTILINESTRING ('
+            '(-179.9999982118607 71.87500000000001,'
+            '-179.0625 71.87500000000001,'
+            '-179.9999982118607 71.87500000000001))')
+        multi_line_strings = [mstring]
 
-class TestQuality(object):
+        src = ccrs.PlateCarree()
+        polygons = src._attach_lines_to_boundary(multi_line_strings, True)
+        # Before fixing, this would contain a geometry which would
+        # cause a segmentation fault.
+        assert polygons == []
+
+    def test_project_degenerate_poly(self):
+        # Tests for the same bug as test_attach_short_loop.
+        # This test calls only the public API, but will cause a
+        # segmentation fault when it fails.
+        # Geometry comes from a matplotlib contourf.
+        polygon = shapely.wkt.loads(
+            'POLYGON (('
+            '178.9687499944748 70.625, '
+            '179.0625 71.875, '
+            '180.9375 71.875, '
+            '179.0625 71.875, '
+            '177.1875 71.875, '
+            '178.9687499944748 70.625))')
+
+        source = ccrs.PlateCarree()
+        target = ccrs.PlateCarree()
+        # Before fixing, this would cause a segmentation fault.
+        polygons = target.project_geometry(polygon, source)
+        assert type(polygons) == sgeom.MultiPolygon
+
+
+class TestQuality:
     def setup_class(self):
         projection = ccrs.RotatedPole(pole_longitude=177.5,
                                       pole_latitude=37.5)
@@ -310,7 +331,7 @@ class TestQuality(object):
             assert abs(num_incr - num_decr) < 3, 'Too much asymmetry.'
 
 
-class PolygonTests(object):
+class PolygonTests:
     def _assert_bounds(self, bounds, x1, y1, x2, y2, delta=1):
         assert abs(bounds[0] - x1) < delta
         assert abs(bounds[1] - y1) < delta

@@ -2,14 +2,12 @@ language: python
 
 env:
     matrix:
-        # These ancient versions are linked to an old libgfortran, but that version
-        # isn't pinned in the package metadata
-        - PYTHON_VERSION=3.5
-          PACKAGES="cython=0.28 numpy=1.10.0 matplotlib=1.5.1 nose proj4=4.9.1 scipy=0.16.0 libgfortran=1 owslib=0.19.1"
-          PYTHONHASHSEED=0  # So pytest-xdist works.
-        - NAME="Latest everything."
+        - NAME="Minimum dependencies."
           PYTHON_VERSION=3.6
-          PACKAGES="cython numpy matplotlib-base proj4 pykdtree scipy fiona"
+          PACKAGES="cython=0.28.5 matplotlib=2.2.2 numpy=1.16 owslib=0.17 proj4=5.2.0 scipy=1.2.0"
+        - NAME="Latest everything."
+          PYTHON_VERSION=3.8
+          PACKAGES="cython fiona matplotlib-base numpy proj pykdtree scipy"
 
 
 sudo: false
@@ -38,7 +36,9 @@ install:
 
   # Customise the testing environment
   # ---------------------------------
-  - PACKAGES="$PACKAGES pillow pytest pytest-xdist filelock pep8 pyshp shapely six requests pyepsg owslib"
+  - PACKAGES="$PACKAGES flufl.lock owslib pep8 pillow pyepsg pyshp pytest"
+  - PACKAGES="$PACKAGES pytest-xdist requests setuptools_scm"
+  - PACKAGES="$PACKAGES setuptools_scm_git_archive shapely"
   - |
     if [[ "$NAME" == "Latest everything"* ]]; then
         PACKAGES="$PACKAGES pytest-cov coveralls";
@@ -60,7 +60,7 @@ install:
   # Install cartopy
   # ---------------
   - pip install --no-deps .
-  - python -c "import cartopy; print('Version ', cartopy.__version__)" && python setup.py version
+  - python -c "import cartopy; print('Version ', cartopy.__version__)"
 
 script:
   # Check that the downloader tool at least knows where to get the data from (but don't actually download it)

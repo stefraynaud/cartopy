@@ -12,8 +12,6 @@ plot results from source coordinates to the GeoAxes' target projection.
 
 """
 
-from __future__ import (absolute_import, division, print_function)
-
 import collections
 import contextlib
 import functools
@@ -38,6 +36,7 @@ import cartopy.crs as ccrs
 import cartopy.feature
 import cartopy.img_transform
 import cartopy.mpl.contour
+import cartopy.mpl.geocollection
 import cartopy.mpl.feature_artist as feature_artist
 import cartopy.mpl.patch as cpatch
 from cartopy.mpl.slippy_image_artist import SlippyImageArtist
@@ -233,31 +232,44 @@ class InterProjectionTransform(mtransforms.Transform):
 class _ViewClippedPathPatch(mpatches.PathPatch):
     def __init__(self, axes, **kwargs):
         self._original_path = mpath.Path(np.empty((0, 2)))
-        super(_ViewClippedPathPatch, self).__init__(self._original_path,
-                                                    **kwargs)
+        super().__init__(self._original_path, **kwargs)
         self._axes = axes
+
+        # We need to use a TransformWrapper as our transform so that we can
+        # update the transform without breaking others' references to this one.
+        self._trans_wrap = mtransforms.TransformWrapper(self.get_transform())
+
+    def set_transform(self, transform):
+        self._trans_wrap.set(transform)
+        super().set_transform(self._trans_wrap)
 
     def set_boundary(self, path, transform):
         self._original_path = path
         self.set_transform(transform)
         self.stale = True
 
+    # Can remove and use matplotlib's once we support only >= 3.2
+    def set_path(self, path):
+        self._path = path
+
     def _adjust_location(self):
         if self.stale:
-            self._path = self._original_path.clip_to_bbox(self.axes.viewLim)
+            self.set_path(self._original_path.clip_to_bbox(self.axes.viewLim))
+            # Some places in matplotlib's tranform stack cache the actual
+            # path so we trigger an update by invalidating the transform.
+            self._trans_wrap.invalidate()
 
     @matplotlib.artist.allow_rasterization
     def draw(self, renderer, *args, **kwargs):
         self._adjust_location()
-        super(_ViewClippedPathPatch, self).draw(renderer, *args, **kwargs)
+        super().draw(renderer, *args, **kwargs)
 
 
 class GeoSpine(mspines.Spine):
     def __init__(self, axes, **kwargs):
         self._original_path = mpath.Path(np.empty((0, 2)))
         kwargs.setdefault('clip_on', False)
-        super(GeoSpine, self).__init__(axes, 'geo', self._original_path,
-                                       **kwargs)
+        super().__init__(axes, 'geo', self._original_path, **kwargs)
         self.set_capstyle('butt')
 
     def set_boundary(self, path, transform):
@@ -273,12 +285,12 @@ class GeoSpine(mspines.Spine):
         # make sure the location is updated so that transforms etc are
         # correct:
         self._adjust_location()
-        return super(GeoSpine, self).get_window_extent(renderer=renderer)
+        return super().get_window_extent(renderer=renderer)
 
     @matplotlib.artist.allow_rasterization
     def draw(self, renderer):
         self._adjust_location()
-        ret = super(GeoSpine, self).draw(renderer)
+        ret = super().draw(renderer)
         self.stale = False
         return ret
 
@@ -316,6 +328,10 @@ class GeoAxes(matplotlib.axes.Axes):
         # Set up a standard map for latlon data.
         geo_axes = plt.axes(projection=cartopy.crs.PlateCarree())
 
+        # Set up a standard map for latlon data for multiple subplots
+        fig, geo_axes = plt.subplots(nrows=2, ncols=2,
+                            subplot_kw={'projection': ccrs.PlateCarree()})
+
         # Set up an OSGB map.
         geo_axes = plt.subplot(2, 2, 1, projection=cartopy.crs.OSGB())
 
@@ -328,6 +344,8 @@ class GeoAxes(matplotlib.axes.Axes):
         plt.contourf(x, y, data, transform=cartopy.crs.PlateCarree())
 
     """
+    name = 'cartopy.geoaxes'
+
     def __init__(self, *args, **kwargs):
         """
         Create a GeoAxes object using standard matplotlib
@@ -346,7 +364,7 @@ class GeoAxes(matplotlib.axes.Axes):
         self.projection = kwargs.pop('map_projection')
         """The :class:`cartopy.crs.Projection` of this GeoAxes."""
 
-        super(GeoAxes, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self._gridliners = []
         self.img_factories = []
         self._done_img_factory = False
@@ -404,7 +422,7 @@ class GeoAxes(matplotlib.axes.Axes):
             # Args and kwargs not allowed.
             assert not bool(args) and not bool(kwargs)
             image = factory
-            super(GeoAxes, self).add_image(image)
+            super().add_image(image)
             return image
 
     @contextlib.contextmanager
@@ -434,19 +452,13 @@ class GeoAxes(matplotlib.axes.Axes):
                 (self.ignore_existing_data_limits,
                     self._autoscaleXon, self._autoscaleYon) = other
 
-    @matplotlib.artist.allow_rasterization
-    def draw(self, renderer=None, **kwargs):
+    def _draw_preprocess(self, renderer):
         """
-        Extend the standard behaviour of :func:`matplotlib.axes.Axes.draw`.
-
-        Draw grid lines and image factory results before invoking standard
-        Matplotlib drawing. A global range is used if no limits have yet
-        been set.
-
+        Perform pre-processing steps shared between :func:`GeoAxes.draw`
+        and :func:`GeoAxes.get_tightbbox`.
         """
         # If data has been added (i.e. autoscale hasn't been turned off)
         # then we should autoscale the view.
-
         if self.get_autoscale_on() and self.ignore_existing_data_limits:
             self.autoscale_view()
 
@@ -457,6 +469,32 @@ class GeoAxes(matplotlib.axes.Axes):
         self.apply_aspect()
         for gl in self._gridliners:
             gl._draw_gridliner(renderer=renderer)
+
+    def get_tightbbox(self, renderer, *args, **kwargs):
+        """
+        Extend the standard behaviour of
+        :func:`matplotlib.axes.Axes.get_tightbbox`.
+
+        Adjust the axes aspect ratio, background patch location, and add
+        gridliners before calculating the tight bounding box.
+        """
+        # Shared processing steps
+        self._draw_preprocess(renderer)
+
+        return matplotlib.axes.Axes.get_tightbbox(
+            self, renderer, *args, **kwargs)
+
+    @matplotlib.artist.allow_rasterization
+    def draw(self, renderer=None, **kwargs):
+        """
+        Extend the standard behaviour of :func:`matplotlib.axes.Axes.draw`.
+
+        Draw grid lines and image factory results before invoking standard
+        Matplotlib drawing. A global range is used if no limits have yet
+        been set.
+        """
+        # Shared processing steps
+        self._draw_preprocess(renderer)
 
         # XXX This interface needs a tidy up:
         #       image drawing on pan/zoom;
@@ -845,6 +883,12 @@ class GeoAxes(matplotlib.axes.Axes):
         self.set_ylim(self.projection.y_limits)
 
     def autoscale_view(self, tight=None, scalex=True, scaley=True):
+        """
+        Autoscale the view limits using the data limits, taking into
+        account the projection of the geoaxes.
+
+        See :meth:`~matplotlib.axes.Axes.imshow()` for more details.
+        """
         matplotlib.axes.Axes.autoscale_view(self, tight=tight,
                                             scalex=scalex, scaley=scaley)
         # Limit the resulting bounds to valid area.
@@ -856,7 +900,6 @@ class GeoAxes(matplotlib.axes.Axes):
             bounds = self.get_ybound()
             self.set_ybound(max(bounds[0], self.projection.y_limits[0]),
                             min(bounds[1], self.projection.y_limits[1]))
-    autoscale_view.__doc__ = matplotlib.axes.Axes.autoscale_view.__doc__
 
     def set_xticks(self, ticks, minor=False, crs=None):
         """
@@ -903,7 +946,7 @@ class GeoAxes(matplotlib.axes.Axes):
         # Switch on drawing of x axis
         self.xaxis.set_visible(True)
 
-        return super(GeoAxes, self).set_xticks(xticks, minor=minor)
+        return super().set_xticks(xticks, minor=minor)
 
     def set_yticks(self, ticks, minor=False, crs=None):
         """
@@ -950,7 +993,7 @@ class GeoAxes(matplotlib.axes.Axes):
         # Switch on drawing of y axis
         self.yaxis.set_visible(True)
 
-        return super(GeoAxes, self).set_yticks(yticks, minor=minor)
+        return super().set_yticks(yticks, minor=minor)
 
     def stock_img(self, name='ne_shaded'):
         """
@@ -1123,7 +1166,7 @@ class GeoAxes(matplotlib.axes.Axes):
                                  'raster', 'natural_earth')
         json_file = os.path.join(bgdir, 'images.json')
 
-        with open(json_file, 'r') as js_obj:
+        with open(json_file) as js_obj:
             dict_in = json.load(js_obj)
         for img_type in dict_in:
             _USER_BG_IMGS[img_type] = dict_in[img_type]
@@ -1276,26 +1319,43 @@ class GeoAxes(matplotlib.axes.Axes):
             regrid_shape = self._regrid_shape_aspect(regrid_shape,
                                                      target_extent)
             warp_array = cartopy.img_transform.warp_array
+            original_extent = extent
             img, extent = warp_array(img,
                                      source_proj=transform,
-                                     source_extent=extent,
+                                     source_extent=original_extent,
                                      target_proj=self.projection,
                                      target_res=regrid_shape,
                                      target_extent=target_extent,
                                      mask_extrapolated=True,
                                      )
+            alpha = kwargs.pop('alpha', None)
+            if np.array(alpha).ndim == 2:
+                alpha, _ = warp_array(alpha,
+                                      source_proj=transform,
+                                      source_extent=original_extent,
+                                      target_proj=self.projection,
+                                      target_res=regrid_shape,
+                                      target_extent=target_extent,
+                                      mask_extrapolated=True,
+                                      )
+            kwargs['alpha'] = alpha
 
             # As a workaround to a matplotlib limitation, turn any images
-            # which are RGB with a mask into RGBA images with an alpha
-            # channel.
-            if (isinstance(img, np.ma.MaskedArray) and
-                    img.shape[2:3] == (3, ) and
-                    img.mask is not False):
-                old_img = img
+            # which are RGB(A) with a mask into unmasked RGBA images with alpha
+            # put into the A channel.
+            if (np.ma.is_masked(img) and len(img.shape) > 2):
+                # if we don't pop alpha, imshow will apply (erroneously?) a
+                # 1D alpha to the RGBA array
+                # kwargs['alpha'] is guaranteed to be either 1D, 2D, or None
+                alpha = kwargs.pop('alpha')
+                old_img = img[:, :, 0:3]
                 img = np.zeros(img.shape[:2] + (4, ), dtype=img.dtype)
                 img[:, :, 0:3] = old_img
                 # Put an alpha channel in if the image was masked.
-                img[:, :, 3] = ~ np.any(old_img.mask, axis=2)
+                if not np.any(alpha):
+                    alpha = 1
+                img[:, :, 3] = np.ma.filled(alpha, fill_value=0) * \
+                    (~np.any(old_img.mask, axis=2))
                 if img.dtype.kind == 'u':
                     img[:, :, 3] *= 255
 
@@ -1307,7 +1367,7 @@ class GeoAxes(matplotlib.axes.Axes):
     def gridlines(self, crs=None, draw_labels=False,
                   xlocs=None, ylocs=None, dms=False,
                   x_inline=None, y_inline=None, auto_inline=True,
-                  xformatter=None, yformatter=None,
+                  xformatter=None, yformatter=None, xlim=None, ylim=None,
                   rotate_labels=True,
                   **kwargs):
         """
@@ -1358,6 +1418,16 @@ class GeoAxes(matplotlib.axes.Axes):
             use of a :class:`cartopy.mpl.ticker.LatitudeFormatter` initiated
             with the ``dms`` argument, if the crs is of
             :class:`~cartopy.crs.PlateCarree` type.
+        xlim: optional
+            Set a limit for the gridlines so that they do not go all the
+            way to the edge of the boundary. xlim can be a single number or
+            a (min, max) tuple. If a single number, the limits will be
+            (-xlim, +xlim).
+        ylim: optional
+            Set a limit for the gridlines so that they do not go all the
+            way to the edge of the boundary. ylim can be a single number or
+            a (min, max) tuple. If a single number, the limits will be
+            (-ylim, +ylim).
         rotate_labels: optional
             Allow the rotation of labels.
 
@@ -1389,7 +1459,7 @@ class GeoAxes(matplotlib.axes.Axes):
             ylocator=ylocs, collection_kwargs=kwargs, dms=dms,
             x_inline=x_inline, y_inline=y_inline, auto_inline=auto_inline,
             xformatter=xformatter, yformatter=yformatter,
-            rotate_labels=rotate_labels)
+            xlim=xlim, ylim=ylim, rotate_labels=rotate_labels)
         self._gridliners.append(gl)
         return gl
 
@@ -1546,6 +1616,33 @@ class GeoAxes(matplotlib.axes.Axes):
         return result
 
     @_add_transform
+    def hexbin(self, x, y, *args, **kwargs):
+        """
+        Add the "transform" keyword to :func:`~matplotlib.pyplot.hexbin`.
+
+        The points are first transformed into the projection of the axes and
+        then the hexbin algorithm is computed using the data in the axes
+        projection.
+
+        Other Parameters
+        ----------------
+        transform
+            A :class:`~cartopy.crs.Projection`.
+        """
+        t = kwargs.pop('transform')
+        pairs = self.projection.transform_points(
+            t,
+            np.asarray(x),
+            np.asarray(y),
+        )
+        x = pairs[:, 0]
+        y = pairs[:, 1]
+
+        result = matplotlib.axes.Axes.hexbin(self, x, y, *args, **kwargs)
+        self.autoscale_view()
+        return result
+
+    @_add_transform
     def pcolormesh(self, *args, **kwargs):
         """
         Add the "transform" keyword to :func:`~matplotlib.pyplot.pcolormesh'.
@@ -1665,24 +1762,35 @@ class GeoAxes(matplotlib.axes.Axes):
             wrap_proj_types = (ccrs._RectangularProjection,
                                ccrs._WarpedRectangularProjection,
                                ccrs.InterruptedGoodeHomolosine,
-                               ccrs.Mercator)
+                               ccrs.Mercator,
+                               ccrs.LambertAzimuthalEqualArea,
+                               ccrs.AzimuthalEquidistant,
+                               ccrs.TransverseMercator,
+                               ccrs.Stereographic)
             if isinstance(t, wrap_proj_types) and \
                     isinstance(self.projection, wrap_proj_types):
 
                 C = C.reshape((Ny - 1, Nx - 1))
                 transformed_pts = transformed_pts.reshape((Ny, Nx, 2))
 
-                # Compute the length of edges in transformed coordinates
+                # Compute the length of diagonals in transformed coordinates
                 with np.errstate(invalid='ignore'):
-                    edge_lengths = np.hypot(
-                        np.diff(transformed_pts[..., 0], axis=1),
-                        np.diff(transformed_pts[..., 1], axis=1)
-                    )
-                    to_mask = (
-                        (edge_lengths > abs(self.projection.x_limits[1] -
-                                            self.projection.x_limits[0]) / 2) |
-                        np.isnan(edge_lengths)
-                    )
+                    xs, ys = transformed_pts[..., 0], transformed_pts[..., 1]
+                    diagonal0_lengths = np.hypot(xs[1:, 1:] - xs[:-1, :-1],
+                                                 ys[1:, 1:] - ys[:-1, :-1])
+                    diagonal1_lengths = np.hypot(xs[1:, :-1] - xs[:-1, 1:],
+                                                 ys[1:, :-1] - ys[:-1, 1:])
+                    # The maximum size of the diagonal of any cell, defined to
+                    # be the projection width divided by 2*sqrt(2)
+                    # TODO: Make this dependent on the boundary of the
+                    #       projection which will help with curved boundaries
+                    size_limit = (abs(self.projection.x_limits[1] -
+                                      self.projection.x_limits[0]) /
+                                  (2*np.sqrt(2)))
+                    to_mask = (np.isnan(diagonal0_lengths) |
+                               (diagonal0_lengths > size_limit) |
+                               np.isnan(diagonal1_lengths) |
+                               (diagonal1_lengths > size_limit))
 
                 if np.any(to_mask):
                     if collection.get_cmap()._rgba_bad[3] != 0.0:
@@ -1692,15 +1800,14 @@ class GeoAxes(matplotlib.axes.Axes):
                                       stacklevel=3)
 
                     # at this point C has a shape of (Ny-1, Nx-1), to_mask has
-                    # a shape of (Ny, Nx-1) and pts has a shape of (Ny*Nx, 2)
+                    # a shape of (Ny-1, Nx-1) and pts has a shape of (Ny*Nx, 2)
 
                     mask = np.zeros(C.shape, dtype=np.bool)
 
-                    # Mask out the neighbouring cells if there was an edge
-                    # found with a large length. NB. Masking too much only has
+                    # Mask out the cells if there was a diagonal found with a
+                    # large length. NB. Masking too much only has
                     # a detrimental impact on performance.
-                    mask[to_mask[:-1, :]] = True  # Edges above a cell.
-                    mask[to_mask[1:, :]] = True  # Edges below a cell.
+                    mask[to_mask] = True
 
                     C_mask = getattr(C, 'mask', None)
 
@@ -1712,36 +1819,45 @@ class GeoAxes(matplotlib.axes.Axes):
 
                     collection.set_array(pcolormesh_data.ravel())
 
-                    # now that the pcolormesh has masked the bad values,
-                    # create a pcolor with just those values that were masked
-                    if C_mask is not None:
-                        # remember to re-apply the original data mask
-                        pcolor_data = np.ma.array(C, mask=~mask | C_mask)
-                    else:
-                        pcolor_data = np.ma.array(C, mask=~mask)
-
                     pts = coords.reshape((Ny, Nx, 2))
-                    if np.any(~pcolor_data.mask):
+                    if np.any(mask):
                         # plot with slightly lower zorder to avoid odd issue
                         # where the main plot is obscured
                         zorder = collection.zorder - .1
                         kwargs.pop('zorder', None)
                         kwargs.setdefault('snap', False)
+                        # Plot all of the wrapped cells.
+                        # `pcolor` only draws polygons where the data is not
+                        # masked, so this will only draw a limited subset of
+                        # polygons that were actually wrapped.
+                        # We will add the original data mask in later to
+                        # make sure that set_array can work in future
+                        # calls on the proper sized array inputs.
+                        pcolor_data = np.ma.array(C.data, mask=~mask)
                         pcolor_col = self.pcolor(pts[..., 0], pts[..., 1],
                                                  pcolor_data, zorder=zorder,
                                                  **kwargs)
-
+                        # Now add back in the masked data if there was any
+                        if C_mask is not None:
+                            pcolor_data = np.ma.array(C, mask=~mask | C_mask)
+                            # The pcolor_col is now possibly shorter than the
+                            # actual collection, so grab the masked cells
+                            pcolor_col.set_array(pcolor_data[mask].ravel())
                         pcolor_col.set_cmap(cmap)
                         pcolor_col.set_norm(norm)
                         pcolor_col.set_clim(vmin, vmax)
                         # scale the data according to the *original* data
                         pcolor_col.norm.autoscale_None(C)
 
-                        # put the pcolor_col on the pcolormesh collection so
-                        # that if really necessary, users can do things post
+                        # put the pcolor_col and mask on the pcolormesh
+                        # collection so that users can do things post
                         # this method
+                        collection._wrapped_mask = mask.ravel()
                         collection._wrapped_collection_fix = pcolor_col
 
+        # Re-cast the QuadMesh as a GeoQuadMesh to enable future wrapping
+        # updates to the collection as well.
+        collection.__class__ = cartopy.mpl.geocollection.GeoQuadMesh
         # END OF PATCH
         ##############
 

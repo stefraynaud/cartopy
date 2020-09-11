@@ -4,10 +4,9 @@
 # See COPYING and COPYING.LESSER in the root of the repository for full
 # licensing details.
 
-from __future__ import (absolute_import, division, print_function)
-
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
+import numpy as np
 import pytest
 
 import cartopy.crs as ccrs
@@ -128,42 +127,15 @@ def test_gridliner_specified_lines():
 
 # The tolerance on these tests are particularly high because of the high number
 # of text objects. A new testing strategy is needed for this kind of test.
-grid_label_tol = grid_label_inline_tol = grid_label_inline_usa_tol = 0.5
-if MPL_VERSION >= '2.0':
-    grid_label_image = 'gridliner_labels'
-    if ccrs.PROJ4_VERSION < (4, 9, 3):
-        # A 0-longitude label is missing on older Proj versions.
-        grid_label_tol = 1.8
-    grid_label_inline_image = 'gridliner_labels_inline'
-    grid_label_inline_usa_image = 'gridliner_labels_inline_usa'
-    if ccrs.PROJ4_VERSION == (4, 9, 1):
-        # AzimuthalEquidistant was previously broken.
-        grid_label_inline_tol = 7.9
-        grid_label_inline_usa_tol = 7.7
-    elif ccrs.PROJ4_VERSION < (5, 0, 0):
-        # Stereographic was previously broken.
-        grid_label_inline_tol = 6.4
-        grid_label_inline_usa_tol = 4.0
+if MPL_VERSION < "3":
+    TOL = 15
 else:
-    grid_label_image = 'gridliner_labels_1.5'
-    grid_label_tol = 1.8
-    grid_label_inline_image = 'gridliner_labels_inline_1.5'
-    grid_label_inline_usa_image = 'gridliner_labels_inline_usa_1.5'
-    if ccrs.PROJ4_VERSION >= (5, 0, 0):
-        # Stereographic was fixed, but test image was not updated.
-        grid_label_inline_tol = 7.9
-        grid_label_inline_usa_tol = 7.9
-    elif ccrs.PROJ4_VERSION >= (4, 9, 2):
-        # AzimuthalEquidistant was fixed, but test image was not updated.
-        grid_label_inline_tol = 5.4
-        grid_label_inline_usa_tol = 7.2
-if (5, 0, 0) <= ccrs.PROJ4_VERSION < (5, 1, 0):
-    # Several projections are broken in these versions, so not plotted.
-    grid_label_inline_tol += 5.1
-    grid_label_inline_usa_tol += 5.5
-elif (6, 0, 0) <= ccrs.PROJ4_VERSION:
-    # Better Robinson projection causes some text movement.
-    grid_label_inline_tol += 1.2
+    TOL = 0.5
+grid_label_tol = grid_label_inline_tol = grid_label_inline_usa_tol = TOL
+grid_label_inline_tol += 1.1
+grid_label_image = 'gridliner_labels'
+grid_label_inline_image = 'gridliner_labels_inline'
+grid_label_inline_usa_image = 'gridliner_labels_inline_usa'
 
 
 @pytest.mark.natural_earth
@@ -236,6 +208,52 @@ def test_grid_labels():
     plt.subplots_adjust(wspace=0.25, hspace=0.25)
 
 
+@pytest.mark.skipif(
+    MPL_VERSION < '3.0.0',
+    reason='Impossible to override tight layout algorithm in mpl < 3')
+@pytest.mark.natural_earth
+@ImageTesting(['gridliner_labels_tight'],
+              tolerance=grid_label_tol if ccrs.PROJ4_VERSION < (7, 1, 0)
+              else 4)
+def test_grid_labels_tight():
+
+    # Ensure tight layout accounts for gridlines
+    fig = plt.figure(figsize=(7, 5))
+
+    crs_pc = ccrs.PlateCarree()
+    crs_merc = ccrs.Mercator()
+
+    ax = fig.add_subplot(2, 2, 1, projection=crs_pc)
+    ax.coastlines(resolution="110m")
+    ax.gridlines(draw_labels=True)
+
+    ax = fig.add_subplot(2, 2, 2, projection=crs_merc)
+    ax.coastlines(resolution="110m")
+    ax.gridlines(draw_labels=True)
+
+    # Matplotlib tight layout is also incorrect if cartopy fails
+    # to adjust aspect ratios first. Relevant when aspect ratio has
+    # changed due to set_extent.
+    ax = fig.add_subplot(2, 2, 3, projection=crs_pc)
+    ax.set_extent([-20, 10.0, 45.0, 70.0])
+    ax.coastlines(resolution="110m")
+    ax.gridlines(draw_labels=True)
+
+    ax = fig.add_subplot(2, 2, 4, projection=crs_merc)
+    ax.set_extent([-20, 10.0, 45.0, 70.0], crs=crs_pc)
+    ax.coastlines(resolution="110m")
+    gl = ax.gridlines(draw_labels=True)
+    gl.rotate_labels = False
+
+    # Apply tight layout
+    fig.tight_layout()
+
+    # Ensure gridliners were plotted
+    for ax in fig.axes:
+        for gl in ax._gridliners:
+            assert hasattr(gl, '_plotted') and gl._plotted
+
+
 @pytest.mark.natural_earth
 @ImageTesting([grid_label_inline_image], tolerance=grid_label_inline_tol)
 def test_grid_labels_inline():
@@ -295,24 +313,24 @@ def test_grid_labels_inline_usa():
 @pytest.mark.parametrize(
     "proj,gcrs,xloc,xfmt,xloc_expected,xfmt_expected",
     [
-       (ccrs.PlateCarree(), ccrs.PlateCarree(),
-        [10, 20], None, mticker.FixedLocator, LongitudeFormatter),
-       (ccrs.PlateCarree(), ccrs.Mercator(),
-        [10, 20], None, mticker.FixedLocator, classic_formatter),
-       (ccrs.PlateCarree(), ccrs.PlateCarree(),
-        mticker.MaxNLocator(nbins=9), None,
-        mticker.MaxNLocator, LongitudeFormatter),
-       (ccrs.PlateCarree(), ccrs.Mercator(),
-        mticker.MaxNLocator(nbins=9), None,
-        mticker.MaxNLocator, classic_formatter),
-       (ccrs.PlateCarree(), ccrs.PlateCarree(),
-        None, None, LongitudeLocator, LongitudeFormatter),
-       (ccrs.PlateCarree(), ccrs.Mercator(),
-        None, None, classic_locator.__class__, classic_formatter),
-       (ccrs.PlateCarree(), ccrs.PlateCarree(),
-        None, mticker.StrMethodFormatter('{x}'),
-        LongitudeLocator, mticker.StrMethodFormatter),
-     ])
+        (ccrs.PlateCarree(), ccrs.PlateCarree(),
+         [10, 20], None, mticker.FixedLocator, LongitudeFormatter),
+        (ccrs.PlateCarree(), ccrs.Mercator(),
+         [10, 20], None, mticker.FixedLocator, classic_formatter),
+        (ccrs.PlateCarree(), ccrs.PlateCarree(),
+         mticker.MaxNLocator(nbins=9), None,
+         mticker.MaxNLocator, LongitudeFormatter),
+        (ccrs.PlateCarree(), ccrs.Mercator(),
+         mticker.MaxNLocator(nbins=9), None,
+         mticker.MaxNLocator, classic_formatter),
+        (ccrs.PlateCarree(), ccrs.PlateCarree(),
+         None, None, LongitudeLocator, LongitudeFormatter),
+        (ccrs.PlateCarree(), ccrs.Mercator(),
+         None, None, classic_locator.__class__, classic_formatter),
+        (ccrs.PlateCarree(), ccrs.PlateCarree(),
+         None, mticker.StrMethodFormatter('{x}'),
+         LongitudeLocator, mticker.StrMethodFormatter),
+    ])
 def test_gridliner_default_fmtloc(
         proj, gcrs, xloc, xfmt, xloc_expected, xfmt_expected):
     plt.figure()
@@ -321,6 +339,32 @@ def test_gridliner_default_fmtloc(
     plt.close()
     assert isinstance(gl.xlocator, xloc_expected)
     assert isinstance(gl.xformatter, xfmt_expected)
+
+
+def test_gridliner_line_limits():
+    fig = plt.figure()
+    ax = plt.subplot(1, 1, 1, projection=ccrs.NorthPolarStereo())
+    ax.set_global()
+    # Test a single value passed in which represents (-lim, lim)
+    xlim, ylim = 125, 75
+    gl = ax.gridlines(xlim=xlim, ylim=ylim)
+    fig.canvas.draw_idle()
+
+    paths = gl.xline_artists[0].get_paths() + gl.yline_artists[0].get_paths()
+    for path in paths:
+        assert (np.min(path.vertices, axis=0) >= (-xlim, -ylim)).all()
+        assert (np.max(path.vertices, axis=0) <= (xlim, ylim)).all()
+
+    # Test a pair of values passed in which represents the min, max
+    xlim = (-125, 150)
+    ylim = (50, 70)
+    gl = ax.gridlines(xlim=xlim, ylim=ylim)
+    fig.canvas.draw_idle()
+
+    paths = gl.xline_artists[0].get_paths() + gl.yline_artists[0].get_paths()
+    for path in paths:
+        assert (np.min(path.vertices, axis=0) >= (xlim[0], ylim[0])).all()
+        assert (np.max(path.vertices, axis=0) <= (xlim[1], ylim[1])).all()
 
 
 @pytest.mark.parametrize(
