@@ -113,8 +113,7 @@ def test_gridliner():
                         top=1 - delta, bottom=0 + delta)
 
 
-@ImageTesting(['gridliner_orthographic'],
-              tolerance=0.2)
+@ImageTesting(['gridliner_orthographic'])
 def test_gridliner_orthographic():
     plt.figure(figsize=(4, 4))
     ax = plt.subplot(111, projection=ccrs.Orthographic())
