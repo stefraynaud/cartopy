@@ -710,6 +710,17 @@ class Gridliner:
                 x=dx, y=dy, units='points')
             kw.update(transform=transform)
 
+            if ypadding < 0:
+                if kw['ha'] == 'left':
+                    kw['ha'] = 'right'
+                elif kw['ha'] == 'right':
+                    kw['ha'] = 'left'
+            if xpadding < 0:
+                if kw['va'] == 'top':
+                    kw['va'] = 'bottom'
+                elif kw['va'] == 'bottom':
+                    kw['va'] = 'top'
+
         return kw, loc
 
     def _update_labels_visibility(self, renderer):
@@ -807,7 +818,8 @@ class Gridliner:
                         if outline_path.contains_point(center):
                             visible = True
                     # Non-inline must not run through the outline.
-                    elif not outline_path.intersects_path(this_path):
+                    elif not outline_path.intersects_path(this_path,
+                                                          filled=False):
                         visible = True
 
                     # Good
