@@ -858,7 +858,7 @@ class Gridliner:
         x = np.concatenate((x.ravel(), xyp[:, 0]))
         y = np.concatenate((y.ravel(), xyp[:, 1]))
 
-        coords = np.column_stack((x.ravel(), y.ravel()))
+        coords = np.column_stack((x, y))
 
         in_data = desired_trans.transform(coords)
 
