@@ -55,7 +55,7 @@ TEST_PROJS = [
 @pytest.mark.natural_earth
 @ImageTesting(['gridliner1'],
               # Robinson projection is slightly better in Proj 6+.
-              tolerance=0.7 if ccrs.PROJ4_VERSION >= (6, 0, 0) else 0.5)
+              tolerance=0.7 if ccrs.PROJ4_VERSION >= (6, 0, 0) else 0.62)
 def test_gridliner():
     ny, nx = 2, 4
 
