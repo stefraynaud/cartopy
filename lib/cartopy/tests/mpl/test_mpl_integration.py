@@ -322,6 +322,47 @@ def test_pcolormesh_global_with_wrap1():
     ax.set_global()  # make sure everything is visible
 
 
+def test_pcolormesh_get_array_with_mask():
+    # make up some realistic data with bounds (such as data from the UM)
+    nx, ny = 36, 18
+    xbnds = np.linspace(0, 360, nx, endpoint=True)
+    ybnds = np.linspace(-90, 90, ny, endpoint=True)
+
+    x, y = np.meshgrid(xbnds, ybnds)
+    data = np.exp(np.sin(np.deg2rad(x)) + np.cos(np.deg2rad(y)))
+    data = data[:-1, :-1]
+
+    ax = plt.subplot(211, projection=ccrs.PlateCarree())
+    c = plt.pcolormesh(xbnds, ybnds, data, transform=ccrs.PlateCarree())
+    assert c._wrapped_collection_fix is not None, \
+        'No pcolormesh wrapping was done when it should have been.'
+
+    assert np.array_equal(data.ravel(), c.get_array()), \
+        'Data supplied does not match data retrieved in wrapped case'
+
+    ax.coastlines()
+    ax.set_global()  # make sure everything is visible
+
+    # Case without wrapping
+    nx, ny = 36, 18
+    xbnds = np.linspace(-60, 60, nx, endpoint=True)
+    ybnds = np.linspace(-80, 80, ny, endpoint=True)
+
+    x, y = np.meshgrid(xbnds, ybnds)
+    data = np.exp(np.sin(np.deg2rad(x)) + np.cos(np.deg2rad(y)))
+    data2 = data[:-1, :-1]
+
+    ax = plt.subplot(212, projection=ccrs.PlateCarree())
+    c = plt.pcolormesh(xbnds, ybnds, data2, transform=ccrs.PlateCarree())
+    ax.coastlines()
+    ax.set_global()  # make sure everything is visible
+
+    assert getattr(c, "_wrapped_collection_fix", None) is None, \
+        'pcolormesh wrapping was done when it should not have been.'
+
+    assert np.array_equal(data2.ravel(), c.get_array()), \
+        'Data supplied does not match data retrieved in unwrapped case'
+
 tolerance = 1.61
 if (5, 0, 0) <= ccrs.PROJ4_VERSION < (5, 1, 0):
     tolerance += 0.8
@@ -449,6 +490,51 @@ def test_pcolormesh_set_array_with_mask():
 
 
 @pytest.mark.natural_earth
+@ImageTesting(['pcolormesh_global_wrap3'], tolerance=tolerance)
+def test_pcolormesh_set_clim_with_mask():
+    """Testing that set_clim works with masked arrays properly."""
+    nx, ny = 33, 17
+    xbnds = np.linspace(-1.875, 358.125, nx, endpoint=True)
+    ybnds = np.linspace(91.25, -91.25, ny, endpoint=True)
+    xbnds, ybnds = np.meshgrid(xbnds, ybnds)
+
+    data = np.exp(np.sin(np.deg2rad(xbnds)) + np.cos(np.deg2rad(ybnds)))
+
+    # this step is not necessary, but makes the plot even harder to do (i.e.
+    # it really puts cartopy through its paces)
+    ybnds = np.append(ybnds, ybnds[:, 1:2], axis=1)
+    xbnds = np.append(xbnds, xbnds[:, 1:2] + 360, axis=1)
+    data = np.ma.concatenate([data, data[:, 0:1]], axis=1)
+
+    data = data[:-1, :-1]
+    data = np.ma.masked_greater(data, 2.6)
+
+    bad_initial_norm = plt.Normalize(-100, 100)
+
+    ax = plt.subplot(311, projection=ccrs.PlateCarree(-45))
+    c = plt.pcolormesh(xbnds, ybnds, data, transform=ccrs.PlateCarree(),
+                       norm=bad_initial_norm)
+    assert c._wrapped_collection_fix is not None, \
+        'No pcolormesh wrapping was done when it should have been.'
+
+    ax.coastlines()
+    ax.set_global()  # make sure everything is visible
+
+    ax = plt.subplot(312, projection=ccrs.PlateCarree(-1.87499952))
+    plt.pcolormesh(xbnds, ybnds, data, transform=ccrs.PlateCarree())
+    ax.coastlines()
+    ax.set_global()  # make sure everything is visible
+
+    ax = plt.subplot(313, projection=ccrs.Robinson(-2))
+    plt.pcolormesh(xbnds, ybnds, data, transform=ccrs.PlateCarree())
+    ax.coastlines()
+    ax.set_global()  # make sure everything is visible
+
+    # Fix clims on c so that test passes
+    c.set_clim(data.min(), data.max())
+
+
+@pytest.mark.natural_earth
 @ImageTesting(['pcolormesh_limited_area_wrap'], tolerance=1.82)
 def test_pcolormesh_limited_area_wrap():
     # make up some realistic data with bounds (such as data from the UM's North
@@ -519,8 +605,6 @@ def test_pcolormesh_diagonal_wrap():
     ax = plt.axes(projection=ccrs.PlateCarree())
     mesh = ax.pcolormesh(xs, ys, zs)
 
-    # Check that the quadmesh is masked
-    assert np.ma.is_masked(mesh.get_array())
     # And that the wrapped_collection is added
     assert hasattr(mesh, "_wrapped_collection_fix")
 
