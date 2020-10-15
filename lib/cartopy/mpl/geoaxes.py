@@ -1374,7 +1374,7 @@ class GeoAxes(matplotlib.axes.Axes):
                   xlocs=None, ylocs=None, dms=False,
                   x_inline=None, y_inline=None, auto_inline=True,
                   xformatter=None, yformatter=None, xlim=None, ylim=None,
-                  rotate_labels=True,
+                  rotate_labels=True, inside=False,
                   **kwargs):
         """
         Automatically add gridlines to the axes, in the given coordinate
@@ -1434,8 +1434,19 @@ class GeoAxes(matplotlib.axes.Axes):
             way to the edge of the boundary. ylim can be a single number or
             a (min, max) tuple. If a single number, the limits will be
             (-ylim, +ylim).
-        rotate_labels: optional
-            Allow the rotation of labels.
+        rotate_labels: optional, bool, str
+            Allow the rotation of non-inline labels.
+
+            - `False`: no rotation and the label position is extrapolated
+              horizontally or vertically.
+            - `"gridlines"`: labels are strictly parallel to gridlines
+              and their position is extrapolated accordindly.
+            - `True` or `"best"`: like `"gridlines`", except that a
+              label that is too vertical is rotated of 90° to make it
+              easier to read.
+
+        inside: bool
+            Draw non-inline labels inside the map boundary instead of outside.
 
         Keyword Parameters
         ------------------
@@ -1465,7 +1476,8 @@ class GeoAxes(matplotlib.axes.Axes):
             ylocator=ylocs, collection_kwargs=kwargs, dms=dms,
             x_inline=x_inline, y_inline=y_inline, auto_inline=auto_inline,
             xformatter=xformatter, yformatter=yformatter,
-            xlim=xlim, ylim=ylim, rotate_labels=rotate_labels)
+            xlim=xlim, ylim=ylim, rotate_labels=rotate_labels,
+            inside=inside)
         self._gridliners.append(gl)
         return gl
 
