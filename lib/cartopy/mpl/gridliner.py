@@ -830,6 +830,7 @@ class Gridliner:
                                     artist.update(
                                         self._get_text_specs(
                                             segment_angle, loc, lonlat))
+                                    artist.update(label_style)
                                     this_path = update_artist(artist, renderer)
 
                             # Is this kind label allowed to be drawn?
@@ -1026,7 +1027,8 @@ class Gridliner:
             kw.update(va='top')
         return kw
 
-    def _get_text_transform(self, padding_angle, loc, lonlat, padding_factor=1):
+    def _get_text_transform(
+            self, padding_angle, loc, lonlat, padding_factor=1):
         """Get transform from angle and padding for non-inline labels"""
 
         # No rotation
@@ -1036,9 +1038,9 @@ class Gridliner:
 
         # Padding
         xpadding = abs(self.xpadding if self.xpadding is not None
-                    else matplotlib.rc_params['xtick.major.pad'])
+                       else matplotlib.rc_params['xtick.major.pad'])
         ypadding = abs(self.ypadding if self.ypadding is not None
-                    else matplotlib.rc_params['ytick.major.pad'])
+                       else matplotlib.rc_params['ytick.major.pad'])
         dx = padding_factor * ypadding * np.cos(padding_angle * np.pi / 180)
         dy = padding_factor * xpadding * np.sin(padding_angle * np.pi / 180)
 
