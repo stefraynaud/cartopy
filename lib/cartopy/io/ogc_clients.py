@@ -12,7 +12,7 @@ The matplotlib interface can make use of RasterSources via the
 with additional specific methods which make use of this for WMS and WMTS
 (:meth:`~cartopy.mpl.geoaxes.GeoAxes.add_wms` and
 :meth:`~cartopy.mpl.geoaxes.GeoAxes.add_wmts`). An example of using WMTS in
-this way can be found at :ref:`sphx_glr_gallery_wmts.py`.
+this way can be found at :ref:`sphx_glr_gallery_web_services_wmts.py`.
 
 """
 
@@ -287,7 +287,7 @@ class WMSRasterSource(RasterSource):
                                      target_resolution)
 
     def fetch_raster(self, projection, extent, target_resolution):
-        target_resolution = [int(np.ceil(val)) for val in target_resolution]
+        target_resolution = [math.ceil(val) for val in target_resolution]
         wms_srs = self._native_srs(projection)
         if wms_srs is not None:
             wms_proj = projection

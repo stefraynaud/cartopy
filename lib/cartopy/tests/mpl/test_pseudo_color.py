@@ -9,22 +9,8 @@ from unittest import mock
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pytest
 
 import cartopy.crs as ccrs
-from cartopy.tests.mpl import MPL_VERSION
-
-
-def test_pcolormesh_fully_masked():
-    data = np.ma.masked_all((30, 40))
-
-    # Check that a fully masked data array doesn't trigger a pcolor call.
-    with mock.patch('cartopy.mpl.geoaxes.GeoAxes.pcolor') as pcolor:
-        ax = plt.axes(projection=ccrs.PlateCarree())
-        ax.pcolormesh(np.linspace(-90, 90, 40), np.linspace(0, 360, 30), data)
-        assert pcolor.call_count == 0, ("pcolor shouldn't have been called, "
-                                        "but was.")
-        plt.close()
 
 
 def test_pcolormesh_partially_masked():
@@ -53,7 +39,6 @@ def test_pcolormesh_invisible():
         plt.close()
 
 
-@pytest.mark.skipif(MPL_VERSION < '2.1.0', reason='Matplotlib is broken.')
 def test_savefig_tight():
     nx, ny = 36, 18
     xbnds = np.linspace(0, 360, nx, endpoint=True)
