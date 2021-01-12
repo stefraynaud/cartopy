@@ -551,6 +551,7 @@ class Gridliner:
           absolute given limit of max_delta_angle by increments of delta_angle
           of difference from the original angle.
         """
+
         # Clear lists of artists
         for lines in self.xline_artists + self.yline_artists:
             if lines in self.axes.collections:
@@ -885,7 +886,7 @@ class Gridliner:
                                     # Non-inline must not run through
                                     # the outline.
                                     if map_boundary_path.intersects_path(
-                                            this_path, filled=False):#padding > 0):
+                                            this_path, filled=padding > 0):
                                         visible = False
 
                                         # Apply new padding
