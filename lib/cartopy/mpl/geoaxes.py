@@ -1105,11 +1105,11 @@ class GeoAxes(matplotlib.axes.Axes):
         else:
             # return only a subset of the image:
             # set up coordinate arrays:
-            d_lat = 180.0 / img.shape[0]
-            d_lon = 360.0 / img.shape[1]
+            d_lat = 180 / img.shape[0]
+            d_lon = 360 / img.shape[1]
             # latitude starts at 90N for this image:
-            lat_pts = (np.arange(img.shape[0]) * -d_lat - (d_lat / 2.0)) + 90.0
-            lon_pts = (np.arange(img.shape[1]) * d_lon + (d_lon / 2.0)) - 180.0
+            lat_pts = (np.arange(img.shape[0]) * -d_lat - (d_lat / 2)) + 90
+            lon_pts = (np.arange(img.shape[1]) * d_lon + (d_lon / 2)) - 180
 
             # which points are in range:
             lat_in_range = np.logical_and(lat_pts >= extent[2],
@@ -1126,10 +1126,10 @@ class GeoAxes(matplotlib.axes.Axes):
                 # now join them up:
                 img_subset = np.concatenate((img_subset1, img_subset2), axis=1)
                 # now define the extent for output that matches those points:
-                ret_extent = [lon_pts[lon_in_range1][0] - d_lon / 2.0,
-                              lon_pts[lon_in_range2][-1] + d_lon / 2.0 + 360,
-                              lat_pts[lat_in_range][-1] - d_lat / 2.0,
-                              lat_pts[lat_in_range][0] + d_lat / 2.0]
+                ret_extent = [lon_pts[lon_in_range1][0] - d_lon / 2,
+                              lon_pts[lon_in_range2][-1] + d_lon / 2 + 360,
+                              lat_pts[lat_in_range][-1] - d_lat / 2,
+                              lat_pts[lat_in_range][0] + d_lat / 2]
             else:
                 # not crossing the dateline, so just find the region:
                 lon_in_range = np.logical_and(lon_pts >= extent[0],
@@ -1349,7 +1349,7 @@ class GeoAxes(matplotlib.axes.Axes):
             # As a workaround to a matplotlib limitation, turn any images
             # which are RGB(A) with a mask into unmasked RGBA images with alpha
             # put into the A channel.
-            if (np.ma.is_masked(img) and len(img.shape) > 2):
+            if np.ma.is_masked(img) and len(img.shape) > 2:
                 # if we don't pop alpha, imshow will apply (erroneously?) a
                 # 1D alpha to the RGBA array
                 # kwargs['alpha'] is guaranteed to be either 1D, 2D, or None
@@ -1374,7 +1374,7 @@ class GeoAxes(matplotlib.axes.Axes):
                   xlocs=None, ylocs=None, dms=False,
                   x_inline=None, y_inline=None, auto_inline=True,
                   xformatter=None, yformatter=None, xlim=None, ylim=None,
-                  rotate_labels=True, inside=False,
+                  rotate_labels="auto",
                   **kwargs):
         """
         Automatically add gridlines to the axes, in the given coordinate
@@ -1435,18 +1435,17 @@ class GeoAxes(matplotlib.axes.Axes):
             a (min, max) tuple. If a single number, the limits will be
             (-ylim, +ylim).
         rotate_labels: optional, bool, str
-            Allow the rotation of non-inline labels.
+            Control the rotation of non-inline labels.
 
-            - `False`: no rotation and the label position is extrapolated
-              horizontally or vertically.
+            - `False` or `"no"`: no rotation and the label position is
+               extrapolated horizontally or vertically (default).
             - `"gridlines"`: labels are strictly parallel to gridlines
               and their position is extrapolated accordindly.
-            - `True` or `"best"`: like `"gridlines`", except that a
-              label that is too vertical is rotated of 90° to make it
-              easier to read.
-
-        inside: bool
-            Draw non-inline labels inside the map boundary instead of outside.
+            - `True` or `"yes"` or `"limited"`: like `"gridlines`",
+              except that a label that is too vertical is rotated of 90°
+              to make it easier to read.
+            - `"auto"`: no rotation except for some projections for which
+              it set to "`gridlines`" or "`limited`".
 
         Keyword Parameters
         ------------------
@@ -1476,8 +1475,7 @@ class GeoAxes(matplotlib.axes.Axes):
             ylocator=ylocs, collection_kwargs=kwargs, dms=dms,
             x_inline=x_inline, y_inline=y_inline, auto_inline=auto_inline,
             xformatter=xformatter, yformatter=yformatter,
-            xlim=xlim, ylim=ylim, rotate_labels=rotate_labels,
-            inside=inside)
+            xlim=xlim, ylim=ylim, rotate_labels=rotate_labels)
         self._gridliners.append(gl)
         return gl
 

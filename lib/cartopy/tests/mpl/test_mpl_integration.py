@@ -34,7 +34,7 @@ if MPL_VERSION >= '3.0.0':
     _STREAMPLOT_STYLE = 'mpl20'
 else:
     _CONTOUR_IMAGE = 'global_contour_wrap_mpl_pre_3.0.0'
-    _STREAMPLOT_IMAGE = 'streamplot_mpl_2.1.0'
+    _STREAMPLOT_IMAGE = 'streamplot_mpl_2.2.2'
 
 
 @pytest.mark.natural_earth
@@ -362,6 +362,7 @@ def test_pcolormesh_get_array_with_mask():
 
     assert np.array_equal(data2.ravel(), c.get_array()), \
         'Data supplied does not match data retrieved in unwrapped case'
+
 
 tolerance = 1.61
 if (5, 0, 0) <= ccrs.PROJ4_VERSION < (5, 1, 0):
@@ -722,7 +723,7 @@ def test_quiver_regrid():
 
 
 @pytest.mark.natural_earth
-@ImageTesting(['quiver_regrid_with_extent'], tolerance=0.51)
+@ImageTesting(['quiver_regrid_with_extent'], tolerance=0.53)
 def test_quiver_regrid_with_extent():
     x = np.arange(-60, 42.5, 2.5)
     y = np.arange(30, 72.5, 2.5)
